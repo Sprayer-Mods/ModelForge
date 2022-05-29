@@ -1,8 +1,4 @@
 <div align="center">
-<p>
-   <a align="left" href="https://ultralytics.com/yolov5" target="_blank">
-   <img width="850" src="https://github.com/ultralytics/yolov5/releases/download/v1.0/splash.jpg"></a>
-</p>
 <br>
 <div>
    <a href="https://github.com/ultralytics/yolov5/actions/workflows/ci-testing.yml"><img src="https://github.com/ultralytics/yolov5/actions/workflows/ci-testing.yml/badge.svg" alt="CI CPU testing"></a>
@@ -16,50 +12,13 @@
 
 <br>
 <p>
-YOLOv5 🚀 is a family of object detection architectures and models pretrained on the COCO dataset, and represents <a href="https://ultralytics.com">Ultralytics</a>
- open-source research into future vision AI methods, incorporating lessons learned and best practices evolved over thousands of hours of research and development.
+ModelForge, a derivative of Ultralytics' YOLOv5, is a family of object detection architectures and models pretrained on the COCO dataset. It represents a joint <a href="https://ultralytics.com">Ultralytics</a>
+  and <a href="https://sprayermods.com">Sprayer Mods</a> open-source research into future vision AI methods, incorporating lessons learned and best practices evolved over thousands of hours of research and development. Sprayer Mods is appending new features and model types to an already amazing repository and model structure. Along with this we are implementing several AWS features [SageMaker, S3, EC2].
 </p>
-
-<div align="center">
-   <a href="https://github.com/ultralytics">
-   <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-github.png" width="2%"/>
-   </a>
-   <img width="2%" />
-   <a href="https://www.linkedin.com/company/ultralytics">
-   <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-linkedin.png" width="2%"/>
-   </a>
-   <img width="2%" />
-   <a href="https://twitter.com/ultralytics">
-   <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-twitter.png" width="2%"/>
-   </a>
-   <img width="2%" />
-   <a href="https://www.producthunt.com/@glenn_jocher">
-   <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-producthunt.png" width="2%"/>
-   </a>
-   <img width="2%" />
-   <a href="https://youtube.com/ultralytics">
-   <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-youtube.png" width="2%"/>
-   </a>
-   <img width="2%" />
-   <a href="https://www.facebook.com/ultralytics">
-   <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-facebook.png" width="2%"/>
-   </a>
-   <img width="2%" />
-   <a href="https://www.instagram.com/ultralytics/">
-   <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-instagram.png" width="2%"/>
-   </a>
-</div>
-
-<!--
-<a align="center" href="https://ultralytics.com/yolov5" target="_blank">
-<img width="800" src="https://github.com/ultralytics/yolov5/releases/download/v1.0/banner-api.png"></a>
--->
-
-</div>
 
 ## <div align="center">Documentation</div>
 
-See the [YOLOv5 Docs](https://docs.ultralytics.com) for full documentation on training, testing and deployment.
+See the [YOLOv5 Docs](https://docs.ultralytics.com) for full documentation on training, testing and deployment with YOLOv5.  
 
 ## <div align="center">Quick Start Examples</div>
 
@@ -200,14 +159,6 @@ Get started in seconds with our verified environments. Click each icon below for
 |:-:|:-:|
 |Automatically track and visualize all your YOLOv5 training runs in the cloud with [Weights & Biases](https://wandb.ai/site?utm_campaign=repo_yolo_readme)|Label and export your custom datasets directly to YOLOv5 for training with [Roboflow](https://roboflow.com/?ref=ultralytics) |
 
-<!-- ## <div align="center">Compete and Win</div>
-
-We are super excited about our first-ever Ultralytics YOLOv5 🚀 EXPORT Competition with **$10,000** in cash prizes!
-
-<p align="center">
-  <a href="https://github.com/ultralytics/yolov5/discussions/3213">
-  <img width="850" src="https://github.com/ultralytics/yolov5/releases/download/v1.0/banner-export-competition.png"></a>
-</p> -->
 
 ## <div align="center">Why YOLOv5</div>
 
@@ -242,6 +193,7 @@ We are super excited about our first-ever Ultralytics YOLOv5 🚀 EXPORT Competi
 |[YOLOv5m6][assets]     |1280 |51.3   |69.3   |887    |11.1   |6.8    |35.7   |50.0
 |[YOLOv5l6][assets]     |1280 |53.7   |71.3   |1784   |15.8   |10.5   |76.8   |111.4
 |[YOLOv5x6][assets]<br>+ [TTA][TTA]|1280<br>1536 |55.0<br>**55.8** |72.7<br>**72.7** |3136<br>- |26.2<br>- |19.4<br>- |140.7<br>- |209.8<br>-
+|More to come...|       |     |       |       |       |       |       |       |
 
 <details>
   <summary>Table Notes (click to expand)</summary>
@@ -278,22 +230,22 @@ professional support requests please visit [https://ultralytics.com/contact](htt
     <a href="https://twitter.com/ultralytics">
         <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-twitter.png" width="3%"/>
     </a>
-    <img width="3%" />
+    <!-- <img width="3%" />
     <a href="https://www.producthunt.com/@glenn_jocher">
     <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-producthunt.png" width="3%"/>
     </a>
     <img width="3%" />
     <a href="https://youtube.com/ultralytics">
         <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-youtube.png" width="3%"/>
-    </a>
-    <img width="3%" />
+    </a> -->
+    <!-- <img width="3%" />
     <a href="https://www.facebook.com/ultralytics">
         <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-facebook.png" width="3%"/>
     </a>
     <img width="3%" />
     <a href="https://www.instagram.com/ultralytics/">
         <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-social-instagram.png" width="3%"/>
-    </a>
+    </a> -->
 </div>
 
 [assets]: https://github.com/ultralytics/yolov5/releases
