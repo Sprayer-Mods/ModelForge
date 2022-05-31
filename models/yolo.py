@@ -4,6 +4,8 @@ YOLO-specific modules
 
 Usage:
     $ python path/to/models/yolo.py --cfg yolov5s.yaml
+
+Modifications: parse_model will be modified to accomodate custom (non-yolo) models
 """
 
 import argparse
