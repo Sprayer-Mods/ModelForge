@@ -38,19 +38,20 @@ VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 't
 BAR_FORMAT = '{l_bar}{bar:10}{r_bar}{bar:-10b}'  # tqdm bar format
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 
-def create_sequence_idxs(seq_size, 
+def create_sequence_idxs(nt, 
                          index):
     """
     Creates a list of sequence indexes. Can be overlapping.
     Probability of overlapping sequences increases with smaller datasets.
     """
-    return list(range(index-seq_size, index))
+    return list(range(index, index+nt))
 
 
 def create_seq_dataloader(path,
                         imgsz,
                         batch_size,
-                        seq_size,
+                        nt,
+                        seq_batch,
                         stride,
                         single_cls=False,
                         hyp=None,
@@ -71,7 +72,8 @@ def create_seq_dataloader(path,
             path,
             imgsz,
             batch_size,
-            seq_size,
+            nt,
+            seq_batch=seq_batch,
             augment=augment,  # augmentation
             hyp=hyp,  # hyperparameters
             rect=rect,  # rectangular batches
@@ -92,7 +94,7 @@ def create_seq_dataloader(path,
                   num_workers=nw,
                   sampler=sampler,
                   pin_memory=True,
-                  collate_fn=LoadSeqAndLabels.collate_fn if seq_size > 1 else 
+                  collate_fn=LoadSeqAndLabels.collate_fn if nt > 1 else 
                              LoadImagesAndLabels.collate_fn), dataset
 
 
@@ -142,7 +144,8 @@ class LoadSeqAndLabels(LoadImagesAndLabels):
                  path,
                  img_size=640,
                  batch_size=16,
-                 seq_size = 8,
+                 nt=8,
+                 seq_batch=False,
                  augment=False,
                  hyp=None,
                  rect=False,
@@ -166,35 +169,56 @@ class LoadSeqAndLabels(LoadImagesAndLabels):
         if self.mosaic:
             LOGGER.warning('WARNING: mosaic data augmentation is not yet supported for videos')
         self.mosaic = False
+        self.nt = nt
+        self.epoch = 0
+        self.seq_batch = seq_batch
+        self.batch_size = batch_size
+        
+        self.start_indices = [np.random.randint(0, len(self.im_files) - nt) for _ in range(batch_size)]
+        self.init_indices = self.start_indices # Used to reset indices after batch
+        self.max_val = len(self.im_files)-self.nt
 
-        self.seq_size = seq_size
 
+    def next_batch(self):
+        if self.seq_batch:
+            self.start_indices = [i+1 % self.max_val for i in self.start_indices]
+
+    def next_epoch(self):
+        self.start_indices = self.init_indices
+
+    def wrap_index(self, index):
+        return index % self.batch_size
 
     def __len__(self):
-        return len(self.im_files) - self.seq_size
+        return self.max_val
 
     def __getitem__(self, index):
         """
-        Returns a sequence of images ending with the given index.
-        To prevent negative indices, they're clamped to a minimum of the sequence length.
+        Returns a sequence of images starting with the given index.
+        To prevent overflow indices, they're clamped to a maximum of the dataset length.
             - s_imgs -> list of tensors
             - s_labels -> list of tensors
             - s_shapes -> list of ints
         """
-        index = np.max([self.seq_size, index])
-        index = self.indices[index]  # linear, shuffled, or image_weights
-        indices = create_sequence_idxs(self.seq_size, index) # array of indices
+        if not self.seq_batch:
+            index = index if index <= self.max_val else self.max_val
+            index = self.indices[index]  # linear, shuffled, or image_weights
+            self.start_indices = create_sequence_idxs(self.nt, index) # array of indices
+        else:
+            index = self.start_indices[self.wrap_index(index)]
 
         hyp = self.hyp
         mosaic = self.mosaic and random.random() < hyp['mosaic']
         s_imgs = []
         s_labels = []
         s_shapes = []
+        s_paths = self.im_files[index:index+self.nt]
         max_nl = 0
-        for ii in indices:
+
+        for ii in range(index, index + self.nt):
             if mosaic:
                 # Load mosaic
-                img, labels = self.load_mosaic(index)
+                img, labels = self.load_mosaic(ii)
                 shapes = None
 
                 # MixUp augmentation
@@ -264,10 +288,10 @@ class LoadSeqAndLabels(LoadImagesAndLabels):
             s_labels.append(labels_out)
             s_shapes.append(shapes)
 
-        if self.seq_size == 1:
-            s_imgs, s_labels, s_shapes = s_imgs[0], s_labels[0], s_shapes[0]
+        if self.nt == 1:
+            s_imgs, s_labels, s_paths, s_shapes = s_imgs[0], s_labels[0], s_paths[0], s_shapes[0]
 
-        return s_imgs, s_labels, self.im_files[index-self.seq_size:index], s_shapes
+        return s_imgs, s_labels, s_paths, s_shapes
 
     @staticmethod
     def collate_fn(batch): 

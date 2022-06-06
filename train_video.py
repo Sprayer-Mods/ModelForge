@@ -226,8 +226,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                 imgsz,
                                 batch_size // WORLD_SIZE,
                                 nt,
-                                gs,
-                                single_cls,
+                                seq_batch=opt.seq_batch,
+                                stride=gs,
+                                single_cls=single_cls,
                                 hyp=hyp,
                                 augment=True,
                                 cache=None if opt.cache == 'val' else opt.cache,
@@ -245,8 +246,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         val_loader = create_seq_dataloader(val_path,
                                        imgsz,
                                        batch_size // WORLD_SIZE * 2,
-                                       gs,
-                                       single_cls,
+                                       nt=nt,
+                                       seq_batch=opt.seq_batch,
+                                       stride=gs,
+                                       single_cls=single_cls,
                                        hyp=hyp,
                                        cache=None if noval else opt.cache,
                                        rect=True,
@@ -348,6 +351,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Forward
             with torch.cuda.amp.autocast(amp):
                 pred = model(imgs)  # forward
+                dataset.next_batch()  # update indices
                 loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
@@ -380,6 +384,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         # Scheduler
         lr = [x['lr'] for x in optimizer.param_groups]  # for loggers
         scheduler.step()
+        dataset.next_epoch()
 
         if RANK in {-1, 0}:
             # mAP
@@ -516,6 +521,7 @@ def parse_opt(known=False):
     
     # Video-specific arguments
     parser.add_argument('--seq-size', default=8, type=int, help='Length of video slice used during detection/training')
+    parser.add_argument('--seq-batch', default=False, type=bool, help='Each batch is sequential wrt. the previous epoch')
 
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
