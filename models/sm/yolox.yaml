@@ -1,12 +1,10 @@
-# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
+# ModelForge by Sprayer Mods, GPL-3.0 license
 
-# Parameters
-nc: 80  # number of classes
+nc: 3  # number of classes
+nl: 2  # number of detection layers
 depth_multiple: 1.0  # model depth multiple
 width_multiple: 1.0  # layer channel multiple
-anchors:
-  - [10,14, 23,27, 37,58]  # P4/16
-  - [81,82, 135,169, 344,319]  # P5/32
+
 
 # YOLOv3-tiny backbone
 backbone:
@@ -37,5 +35,6 @@ head:
    [[-1, 8], 1, Concat, [1]],  # cat backbone P4
    [-1, 1, Conv, [256, 3, 1]],  # 19 (P4/16-medium)
 
-   [[19, 15], 1, YoloDetect, [nc, anchors]],  # YoloDetect(P4, P5)
+   [[19, 15], 1, YOLOXHead, [nc, nl]],  # YoloDetect(P4, P5)
   ]
+

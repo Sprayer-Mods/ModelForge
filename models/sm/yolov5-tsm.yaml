@@ -1,9 +1,11 @@
-# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
+# ModelForge by Sprayer Mods, GPL-3.0 license
+  #  [-1, 2, TSMResBlock, [32]],
+  #  [-1, 1, C3, [128]],
 
 # Parameters
 nc: 80  # number of classes
-depth_multiple: 1.0  # model depth multiple
-width_multiple: 1.0  # layer channel multiple
+depth_multiple: 0.33  # model depth multiple
+width_multiple: 0.25  # layer channel multiple
 anchors:
   - [10,13, 16,30, 33,23]  # P3/8
   - [30,61, 62,45, 59,119]  # P4/16
@@ -28,20 +30,20 @@ backbone:
 head:
   [[-1, 1, Conv, [512, 1, 1]],
    [-1, 1, nn.Upsample, [None, 2, 'nearest']],
-   [[-1, 6], 1, Concat, [1]],  # cat backbone P4
+   [[-1, 6], 1, Concat, [2]],  # cat backbone P4
    [-1, 3, C3, [512, False]],  # 13
 
    [-1, 1, Conv, [256, 1, 1]],
    [-1, 1, nn.Upsample, [None, 2, 'nearest']],
-   [[-1, 4], 1, Concat, [1]],  # cat backbone P3
+   [[-1, 4], 1, Concat, [2]],  # cat backbone P3
    [-1, 3, C3, [256, False]],  # 17 (P3/8-small)
 
    [-1, 1, Conv, [256, 3, 2]],
-   [[-1, 14], 1, Concat, [1]],  # cat head P4
+   [[-1, 14], 1, Concat, [2]],  # cat head P4
    [-1, 3, C3, [512, False]],  # 20 (P4/16-medium)
 
    [-1, 1, Conv, [512, 3, 2]],
-   [[-1, 10], 1, Concat, [1]],  # cat head P5
+   [[-1, 10], 1, Concat, [2]],  # cat head P5
    [-1, 3, C3, [1024, False]],  # 23 (P5/32-large)
 
    [[17, 20, 23], 1, YoloDetect, [nc, anchors]],  # YoloDetect(P3, P4, P5)

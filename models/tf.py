@@ -270,7 +270,7 @@ class TFSPPF(keras.layers.Layer):
         return self.cv2(tf.concat([x, y1, y2, self.m(y2)], 3))
 
 
-class TFDetect(keras.layers.Layer):
+class TFYoloDetect(keras.layers.Layer):
     # TF YOLOv5 Detect layer
     def __init__(self, nc=80, anchors=(), ch=(), imgsz=(640, 640), w=None):  # detection layer
         super().__init__()
@@ -377,7 +377,7 @@ def parse_model(d, ch, model, imgsz):  # model_dict, input_channels(3)
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[-1 if x == -1 else x + 1] for x in f)
-        elif m is Detect:
+        elif m is YoloDetect:
             args.append([ch[x + 1] for x in f])
             if isinstance(args[1], int):  # number of anchors
                 args[1] = [list(range(args[1] * 2))] * len(f)
