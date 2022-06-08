@@ -1,0 +1,14 @@
+# Sprayer Mods modification - GPL-3.0 license
+
+path: "datasets/sequential_soy"
+train: "train.txt"
+val: "valid.txt"
+# test: ""
+
+nc: 2
+nt: 1 # number of timesteps
+names: ["weed", "crop"]
+
+
+# download: |
+# Script to download here

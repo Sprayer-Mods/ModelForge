@@ -35,6 +35,6 @@ head:
    [[-1, 8], 1, Concat, [1]],  # cat backbone P4
    [-1, 1, Conv, [256, 3, 1]],  # 19 (P4/16-medium)
 
-   [[19, 15], 1, YOLOXHead, [nc, nl]],  # YoloDetect(P4, P5)
+   [[19, 15], 1, YOLOXHead, [nc, nl]],  # Detect(P4, P5)
   ]
 

@@ -396,7 +396,7 @@ class DetectMultiBackend(nn.Module):
             LOGGER.info(f'Loading {w} for CoreML inference...')
             import coremltools as ct
             model = ct.models.MLModel(w)
-        else:  # TensorFlow (SavedYoloModel, GraphDef, Lite, Edge TPU)
+        else:  # TensorFlow (SavedModel, GraphDef, Lite, Edge TPU)
             if saved_model:  # SavedModel
                 LOGGER.info(f'Loading {w} for TensorFlow SavedModel inference...')
                 import tensorflow as tf
@@ -472,7 +472,7 @@ class DetectMultiBackend(nn.Module):
             else:
                 k = 'var_' + str(sorted(int(k.replace('var_', '')) for k in y)[-1])  # output key
                 y = y[k]  # output
-        else:  # TensorFlow (SavedYoloModel, GraphDef, Lite, Edge TPU)
+        else:  # TensorFlow (SavedModel, GraphDef, Lite, Edge TPU)
             im = im.permute(0, 2, 3, 1).cpu().numpy()  # torch BCHW to numpy BHWC shape(1,320,192,3)
             if self.saved_model:  # SavedModel
                 y = (self.model(im, training=False) if self.keras else self.model(im)).numpy()
@@ -547,7 +547,7 @@ class AutoShape(nn.Module):
         # Apply to(), cpu(), cuda(), half() to model tensors that are not parameters or registered buffers
         self = super()._apply(fn)
         if self.pt:
-            m = self.model.model.model[-1] if self.dmb else self.model.model[-1]  # YoloDetect()
+            m = self.model.model.model[-1] if self.dmb else self.model.model[-1]  # Detect()
             m.stride = fn(m.stride)
             m.grid = list(map(fn, m.grid))
             if isinstance(m.anchor_grid, list):

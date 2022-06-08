@@ -40,7 +40,7 @@ except ImportError:
     thop = None
 
 
-class YoloDetect(nn.Module):
+class Detect(nn.Module):
     stride = None  # strides computed during build
     onnx_dynamic = False  # ONNX export parameter
     export = False  # export mode
@@ -95,7 +95,7 @@ class YoloDetect(nn.Module):
         return grid, anchor_grid
 
 
-class YoloModel(nn.Module):
+class Model(nn.Module):
     # YOLOv5 model
     def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None, nt=1):  # model, input channels, number of classes
         super().__init__()
@@ -120,8 +120,8 @@ class YoloModel(nn.Module):
         self.inplace = self.yaml.get('inplace', True)
 
         # Build strides, anchors
-        m = self.model[-1]  # YoloDetect()
-        if isinstance(m, YoloDetect):
+        m = self.model[-1]  # Detect()
+        if isinstance(m, Detect):
             s = 256  # 2x min stride
             m.inplace = self.inplace
             m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])  # forward
@@ -196,7 +196,7 @@ class YoloModel(nn.Module):
         return y
 
     def _profile_one_layer(self, m, x, dt):
-        c = isinstance(m, YoloDetect)  # is final layer, copy input as inplace fix
+        c = isinstance(m, Detect)  # is final layer, copy input as inplace fix
         o = thop.profile(m, inputs=(x.copy() if c else x,), verbose=False)[0] / 1E9 * 2 if thop else 0  # FLOPs
         t = time_sync()
         for _ in range(10):
@@ -208,10 +208,10 @@ class YoloModel(nn.Module):
         if c:
             LOGGER.info(f"{sum(dt):10.2f} {'-':>10s} {'-':>10s}  Total")
 
-    def _initialize_biases(self, cf=None):  # initialize biases into YoloDetect(), cf is class frequency
+    def _initialize_biases(self, cf=None):  # initialize biases into Detect(), cf is class frequency
         # https://arxiv.org/abs/1708.02002 section 3.3
         # cf = torch.bincount(torch.tensor(np.concatenate(dataset.labels, 0)[:, 0]).long(), minlength=nc) + 1.
-        m = self.model[-1]  # YoloDetect() module
+        m = self.model[-1]  # Detect() module
         for mi, s in zip(m.m, m.stride):  # from
             b = mi.bias.view(m.na, -1).detach()  # conv.bias(255) to (3,85)
             b[:, 4] += math.log(8 / (640 / s) ** 2)  # obj (8 objects per 640 image)
@@ -219,7 +219,7 @@ class YoloModel(nn.Module):
             mi.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
 
     def _print_biases(self):
-        m = self.model[-1]  # YoloDetect() module
+        m = self.model[-1]  # Detect() module
         for mi in m.m:  # from
             b = mi.bias.detach().view(m.na, -1).T  # conv.bias(255) to (3,85)
             LOGGER.info(
@@ -246,8 +246,8 @@ class YoloModel(nn.Module):
     def _apply(self, fn):
         # Apply to(), cpu(), cuda(), half() to model tensors that are not parameters or registered buffers
         self = super()._apply(fn)
-        m = self.model[-1]  # YoloDetect()
-        if isinstance(m, YoloDetect):
+        m = self.model[-1]  # Detect()
+        if isinstance(m, Detect):
             m.stride = fn(m.stride)
             m.grid = list(map(fn, m.grid))
             if isinstance(m.anchor_grid, list):
@@ -255,7 +255,7 @@ class YoloModel(nn.Module):
         return self
 
 
-def parse_model(d, ch, video=False):  # model_dict, input_channels(3)
+def parse_model(d, ch):  # model_dict, input_channels(3)
     LOGGER.info(f"\n{'':>3}{'from':>18}{'n':>3}{'params':>10}  {'module':<40}{'arguments':<30}")
     # Top part of yaml
     try:
@@ -280,7 +280,7 @@ def parse_model(d, ch, video=False):  # model_dict, input_channels(3)
         n = n_ = max(round(n * gd), 1) if n > 1 else n  # depth gain
         if m in (Conv, GhostConv, Bottleneck, GhostBottleneck, SPP, SPPF, DWConv, MixConv2d, Focus, CrossConv,
                  BottleneckCSP, C3, C3TR, C3SPP, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x, TConv,
-                 TDWConv, TC3, TBottleneck):
+                 TDWConv, TC3, TBottleneck, TSMResBlock):
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
                 c2 = make_divisible(c2 * gw, 8)
@@ -292,7 +292,7 @@ def parse_model(d, ch, video=False):  # model_dict, input_channels(3)
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
-        elif m is YoloDetect:
+        elif m is Detect:
             args.append([ch[x] for x in f])
             if isinstance(args[1], int):  # number of anchors
                 args[1] = [list(range(args[1] * 2))] * len(f)
@@ -303,9 +303,6 @@ def parse_model(d, ch, video=False):  # model_dict, input_channels(3)
             c2 = ch[f] // args[0] ** 2
         elif m is YOLOXHead:  # Not currently functional
             args = [nc, nl]
-        elif m is TSMResBlock:
-            c1 = c2 = args[0]
-            args.append(n)
         else:
             c2 = ch[f]
 
@@ -337,7 +334,7 @@ if __name__ == '__main__':
 
     # Create model
     im = torch.rand(opt.batch_size, 3, 640, 640).to(device)
-    model = YoloModel(opt.cfg).to(device)
+    model = Model(opt.cfg).to(device)
 
     # Options
     if opt.line_profile:  # profile layer by layer
@@ -349,7 +346,7 @@ if __name__ == '__main__':
     elif opt.test:  # test all models
         for cfg in Path(ROOT / 'models').rglob('yolo*.yaml'):
             try:
-                _ = YoloModel(cfg)
+                _ = Model(cfg)
             except Exception as e:
                 print(f'Error in {cfg}: {e}')
 

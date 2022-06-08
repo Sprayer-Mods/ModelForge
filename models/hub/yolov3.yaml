@@ -47,5 +47,5 @@ head:
    [-1, 1, Bottleneck, [256, False]],
    [-1, 2, Bottleneck, [256, False]],  # 27 (P3/8-small)
 
-   [[27, 22, 15], 1, YoloDetect, [nc, anchors]],   # YoloDetect(P3, P4, P5)
+   [[27, 22, 15], 1, Detect, [nc, anchors]],   # Detect(P3, P4, P5)
   ]

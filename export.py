@@ -292,7 +292,7 @@ def export_saved_model(model,
         import tensorflow as tf
         from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
 
-        from models.tf import TFYoloDetect, TFModel
+        from models.tf import TFDetect, TFModel
 
         LOGGER.info(f'\n{prefix} starting export with tensorflow {tf.__version__}...')
         f = str(file).replace('.pt', '_saved_model')
@@ -456,7 +456,7 @@ def run(
         device='cpu',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         include=('torchscript', 'onnx'),  # include formats
         half=False,  # FP16 half-precision export
-        inplace=False,  # set YOLOv5 YoloDetect() inplace=True
+        inplace=False,  # set YOLOv5 Detect() inplace=True
         train=False,  # model.train() mode
         keras=False,  # use Keras
         optimize=False,  # TorchScript: optimize for mobile
@@ -501,9 +501,9 @@ def run(
     # Update model
     if half and not coreml and not xml:
         im, model = im.half(), model.half()  # to FP16
-    model.train() if train else model.eval()  # training mode = no YoloDetect() layer grid construction
+    model.train() if train else model.eval()  # training mode = no Detect() layer grid construction
     for k, m in model.named_modules():
-        if isinstance(m, YoloDetect):
+        if isinstance(m, Detect):
             m.inplace = inplace
             m.onnx_dynamic = dynamic
             m.export = True
@@ -557,7 +557,7 @@ def run(
     if any(f):
         LOGGER.info(f'\nExport complete ({time.time() - t:.2f}s)'
                     f"\nResults saved to {colorstr('bold', file.parent.resolve())}"
-                    f"\nYoloDetect:          python detect.py --weights {f[-1]}"
+                    f"\nDetect:          python detect.py --weights {f[-1]}"
                     f"\nPyTorch Hub:     model = torch.hub.load('ultralytics/yolov5', 'custom', '{f[-1]}')"
                     f"\nValidate:        python val.py --weights {f[-1]}"
                     f"\nVisualize:       https://netron.app")
@@ -572,7 +572,7 @@ def parse_opt():
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
     parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--half', action='store_true', help='FP16 half-precision export')
-    parser.add_argument('--inplace', action='store_true', help='set YOLOv5 YoloDetect() inplace=True')
+    parser.add_argument('--inplace', action='store_true', help='set YOLOv5 Detect() inplace=True')
     parser.add_argument('--train', action='store_true', help='model.train() mode')
     parser.add_argument('--keras', action='store_true', help='TF: use Keras')
     parser.add_argument('--optimize', action='store_true', help='TorchScript: optimize for mobile')

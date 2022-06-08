@@ -67,21 +67,24 @@ def create_seq_dataloader(path,
         LOGGER.warning('WARNING: --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
 
+    if seq_batch:
+        shuffle = False
+
     with torch_distributed_zero_first(rank):  # init dataset *.cache only once if DDP
         dataset = LoadSeqAndLabels(
-            path,
-            imgsz,
-            batch_size,
-            nt,
-            seq_batch=seq_batch,
-            augment=augment,  # augmentation
-            hyp=hyp,  # hyperparameters
-            rect=rect,  # rectangular batches
-            cache_images=cache,
-            single_cls=single_cls,
-            stride=int(stride),
-            pad=pad,
-            prefix=prefix)
+                    path,
+                    imgsz,
+                    batch_size,
+                    nt,
+                    seq_batch=seq_batch,
+                    augment=augment,  # augmentation
+                    hyp=hyp,  # hyperparameters
+                    rect=rect,  # rectangular batches
+                    cache_images=cache,
+                    single_cls=single_cls,
+                    stride=int(stride),
+                    pad=pad,
+                    prefix=prefix)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -100,9 +103,10 @@ def create_seq_dataloader(path,
 
 
 class InfiniteSeqDataLoader(dataloader.DataLoader):
-    """ Dataloader that reuses workers
-
-    Uses same syntax as vanilla DataLoader
+    """ 
+    Dataloader that reuses workers.
+    Uses same syntax as vanilla DataLoader.
+    Loads batches from dataset.
     """
 
     def __init__(self, *args, **kwargs):
@@ -122,7 +126,7 @@ class _RepeatSeqSampler:
     """ Sampler that repeats forever
 
     Args:
-        sampler (Sampler)
+        sampler (Sampler): Tells data loader how to sample data
     """
 
     def __init__(self, sampler):
@@ -145,7 +149,7 @@ class LoadSeqAndLabels(LoadImagesAndLabels):
                  img_size=640,
                  batch_size=16,
                  nt=8,
-                 seq_batch=False,
+                 seq_batch=True,
                  augment=False,
                  hyp=None,
                  rect=False,
@@ -171,23 +175,27 @@ class LoadSeqAndLabels(LoadImagesAndLabels):
         self.mosaic = False
         self.nt = nt
         self.epoch = 0
+        self.batch_idx = 0
         self.seq_batch = seq_batch
         self.batch_size = batch_size
         
-        self.start_indices = [np.random.randint(0, len(self.im_files) - nt) for _ in range(batch_size)]
-        self.init_indices = self.start_indices # Used to reset indices after batch
+        self.start_indices = [np.random.randint(0, self.n - nt) for _ in range(batch_size)]
         self.max_val = len(self.im_files)-self.nt
 
 
     def next_batch(self):
+        """
+        Update indices for next batch by incrementing.
+        """
         if self.seq_batch:
-            self.start_indices = [i+1 % self.max_val for i in self.start_indices]
+            self.start_indices = [(idx + 1) % self.n for idx in self.start_indices]
 
     def next_epoch(self):
-        self.start_indices = self.init_indices
-
-    def wrap_index(self, index):
-        return index % self.batch_size
+        """
+        Reset batch indices to new, random values.
+        """
+        self.start_indices = \
+            [np.random.randint(0, len(self.im_files) - self.nt) for _ in range(self.batch_size)]
 
     def __len__(self):
         return self.max_val
@@ -205,7 +213,10 @@ class LoadSeqAndLabels(LoadImagesAndLabels):
             index = self.indices[index]  # linear, shuffled, or image_weights
             self.start_indices = create_sequence_idxs(self.nt, index) # array of indices
         else:
-            index = self.start_indices[self.wrap_index(index)]
+            mod = index % self.batch_size
+            if mod == 0 and index != 0:
+                self.next_batch()
+            index = self.start_indices[mod]
 
         hyp = self.hyp
         mosaic = self.mosaic and random.random() < hyp['mosaic']
@@ -288,6 +299,7 @@ class LoadSeqAndLabels(LoadImagesAndLabels):
             s_labels.append(labels_out)
             s_shapes.append(shapes)
 
+        # Flattening list structure
         if self.nt == 1:
             s_imgs, s_labels, s_paths, s_shapes = s_imgs[0], s_labels[0], s_paths[0], s_shapes[0]
 

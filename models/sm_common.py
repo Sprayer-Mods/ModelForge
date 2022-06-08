@@ -2,11 +2,16 @@
 
 import math
 import warnings
+from pkg_resources import require
 
-from torch import nn, zeros_like, cat, unsqueeze
+from torch import (nn, zeros_like, cat, stack, is_tensor)
+import torch
 import torch.functional as F
+import torch.nn.functional as nnF
+from torch.cuda import is_available, device_count
 
 from models.common import Conv, autopad
+from utils.torch_utils import match_shape
 
 
 def last_frame(x):
@@ -88,6 +93,7 @@ class TSPPF(nn.Module):
 
 class TemporalShift(nn.Module):
     """
+    v1.1
     Note: Currently only supports a timestep of 1 (keeps a cache of prev frame)
     """
     def __init__(self, online=True):
@@ -97,40 +103,42 @@ class TemporalShift(nn.Module):
         self.shift = self.online_shift if online else self.offline_shift
 
     def forward(self, x):
-        x = unsqueeze(x, 1) # [n, c, w, h] -> [n, 1, c, w, h]
-        if not self.cache:
-            self.cache = zeros_like(x)
-        x = self.shift(x)
-        return x
+        return self.shift(x)
 
     def online_shift(self, x):
-        _, _, c, _, _ = x.size()
+        _, c, _, _ = x.size()
         
         fold = c // 2
-        x = cat((x, self.cache), dim=1)
+        if not is_tensor(self.cache):
+            self.cache = x.detach().clone()
+
+        # Note: order does matter with stack
+        x = stack((self.cache.to(x.device), x), dim=0) # x.dims -> [2, n, c, w, h]
+                                          # x -> [cache, x]
+
         out = zeros_like(x)
-        
-        out[:, 1, :fold] = x[:, 0, :fold]  # shift left
+        #   t  n  c...
+        out[1, :, :fold] = x[0, :, :fold]  # incorporate channels from cache
         out[:, :, fold:] = x[:, :, fold:]  # no shift
+        
+        self.cache = out[1].detach().clone() # set cache to current frame
 
-        self.cache = out[:, 0, ...]        # Earlier frames
-
-        return out[:, 1, ...]              # Later frames
+        return out[1] # current frame after shift
     
     def offline_shift(self, x):
         _, _, c, _, _ = x.size()
         
         fold = c // 3
+        self.cache = x[0, ...].detach().clone()       # Earlier frames
+
         x = cat((x, self.cache), dim=1)
         out = zeros_like(x)
 
-        out[:, :-1, :fold] = x[:, 1:, :fold]  # shift left
+        out[:, :-1, :fold] = x[:, 1:, :fold]# shift left
         out[:, 1:, :2 * fold] = x[:, :-1, :2 * fold]  # shift right
         out[:, :, 2 * fold:] = x[:, :, 2 * fold:]  # no shift
 
-        self.cache = out[:, 0, ...]        # Earlier frames
-
-        return out
+        return out[:, 1, ...]
 
 
 class TemporalPool(nn.Module):
@@ -177,21 +185,19 @@ class TSMResBlock(nn.Module):
         shortcut (bool): if True, residual tensor addition is enabled.
     """
 
-    def __init__(self, ch, n=1, shortcut=True):
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, act=True, shortcut=True):
         super().__init__()
         self.shortcut = shortcut
-        self.module_list = nn.ModuleList()
-        for i in range(n):
-            resblock = nn.ModuleList()
-            resblock.append(TemporalShift(online=True))
-            resblock.append(Conv(ch, ch, 1, 1))
-            resblock.append(Conv(ch, ch, 3, 1))
-            self.module_list.append(resblock)
+        self.out_conv = Conv(c1, c2, k, s, p, g)
+
+        self.resblock = nn.ModuleList()
+        self.resblock.append(TemporalShift(online=True))
+        self.resblock.append(Conv(c1, c1, 1, 1))
+        self.resblock.append(Conv(c1, c1, 3, 1))
 
     def forward(self, x):
-        for module in self.module_list:
-            h = x
-            for res in module:
-                h = res(x)
-            x = x + h if self.shortcut else h
-        return x
+        h = x
+        for res in self.resblock:
+            h = res(x)
+        x = x + h if self.shortcut else h
+        return self.out_conv(x)

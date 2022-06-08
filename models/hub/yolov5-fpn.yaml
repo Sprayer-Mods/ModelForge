@@ -38,5 +38,5 @@ head:
    [-1, 1, Conv, [256, 1, 1]],
    [-1, 3, C3, [256, False]],  # 18 (P3/8-small)
 
-   [[18, 14, 10], 1, YoloDetect, [nc, anchors]],  # YoloDetect(P3, P4, P5)
+   [[18, 14, 10], 1, Detect, [nc, anchors]],  # Detect(P3, P4, P5)
   ]

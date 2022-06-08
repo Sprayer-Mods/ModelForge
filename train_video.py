@@ -38,7 +38,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 import val  # for end-of-epoch mAP
 from models.experimental import attempt_load
 from models.video import VideoModel
-from models.yolo import YoloModel
+from models.yolo import Model
 from utils.autoanchor import check_anchors
 from utils.autobatch import check_train_batch_size
 from utils.callbacks import Callbacks
@@ -115,7 +115,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     check_suffix(weights, '.pt')  # check weights
     pretrained = weights.endswith('.pt')
 
-    _m = VideoModel if nt > 1 else YoloModel
+    _m = VideoModel if nt > 1 else Model
 
     if pretrained:
         with torch_distributed_zero_first(LOCAL_RANK):
@@ -145,7 +145,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # Batch size
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
-        batch_size = np.ceil(check_train_batch_size(model, imgsz, amp) / nt)
+        batch_size = int(np.ceil(check_train_batch_size(model, imgsz, amp) / nt))
         loggers.on_params_update({"batch_size": batch_size})
 
     # Optimizer
@@ -222,7 +222,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         LOGGER.info('Using SyncBatchNorm()')
 
     # Trainloader
-    train_loader, dataset = create_seq_dataloader(train_path,
+    train_loader, dataset = create_seq_dataloader(
+                                train_path,
                                 imgsz,
                                 batch_size // WORLD_SIZE,
                                 nt,
@@ -351,7 +352,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Forward
             with torch.cuda.amp.autocast(amp):
                 pred = model(imgs)  # forward
-                dataset.next_batch()  # update indices
                 loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode

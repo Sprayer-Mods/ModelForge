@@ -28,7 +28,7 @@ if platform.system() != 'Windows':
 from models.common import *
 from models.sm_common import last_frame
 from models.experimental import *
-from models.yolo import YoloDetect, YoloModel
+from models.yolo import Detect, Model
 from utils.autoanchor import check_anchor_order
 from utils.general import LOGGER, check_version, check_yaml, make_divisible, print_args
 from utils.plots import feature_visualization
@@ -41,7 +41,7 @@ except ImportError:
     thop = None
 
 
-class VideoModel(YoloModel):
+class VideoModel(Model):
     # YOLOv5 model
     def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None, nt=2):  # model, input channels, number of classes
         super().__init__(cfg, ch, nc, anchors)
@@ -108,7 +108,7 @@ class VideoModel(YoloModel):
         return y
 
     def _profile_one_layer(self, m, x, dt):
-        c = isinstance(m, YoloDetect)  # is final layer, copy input as inplace fix
+        c = isinstance(m, Detect)  # is final layer, copy input as inplace fix
         o = thop.profile(m, inputs=(x.copy() if c else x,), verbose=False)[0] / 1E9 * 2 if thop else 0  # FLOPs
         t = time_sync()
         for _ in range(10):
@@ -120,10 +120,10 @@ class VideoModel(YoloModel):
         if c:
             LOGGER.info(f"{sum(dt):10.2f} {'-':>10s} {'-':>10s}  Total")
 
-    def _initialize_biases(self, cf=None):  # initialize biases into YoloDetect(), cf is class frequency
+    def _initialize_biases(self, cf=None):  # initialize biases into Detect(), cf is class frequency
         # https://arxiv.org/abs/1708.02002 section 3.3
         # cf = torch.bincount(torch.tensor(np.concatenate(dataset.labels, 0)[:, 0]).long(), minlength=nc) + 1.
-        m = self.model[-1]  # YoloDetect() module
+        m = self.model[-1]  # Detect() module
         for mi, s in zip(m.m, m.stride):  # from
             b = mi.bias.view(m.na, -1).detach()  # conv.bias(255) to (3,85)
             b[:, 4] += math.log(8 / (640 / s) ** 2)  # obj (8 objects per 640 image)
@@ -131,7 +131,7 @@ class VideoModel(YoloModel):
             mi.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
 
     def _print_biases(self):
-        m = self.model[-1]  # YoloDetect() module
+        m = self.model[-1]  # Detect() module
         for mi in m.m:  # from
             b = mi.bias.detach().view(m.na, -1).T  # conv.bias(255) to (3,85)
             LOGGER.info(
@@ -158,8 +158,8 @@ class VideoModel(YoloModel):
     def _apply(self, fn):
         # Apply to(), cpu(), cuda(), half() to model tensors that are not parameters or registered buffers
         self = super()._apply(fn)
-        m = self.model[-1]  # YoloDetect()
-        if isinstance(m, YoloDetect):
+        m = self.model[-1]  # Detect()
+        if isinstance(m, Detect):
             m.stride = fn(m.stride)
             m.grid = list(map(fn, m.grid))
             if isinstance(m.anchor_grid, list):
