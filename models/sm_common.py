@@ -4,7 +4,7 @@ import math
 import warnings
 from pkg_resources import require
 
-from torch import (nn, zeros_like, cat, stack, is_tensor)
+from torch import (nn, zeros_like, cat, stack, is_tensor, empty_like)
 import torch
 import torch.functional as F
 import torch.nn.functional as nnF
@@ -102,6 +102,7 @@ class TemporalShift(nn.Module):
         self.cache = None
         self.shift = self.online_shift if online else self.offline_shift
 
+    @torch.no_grad()
     def forward(self, x):
         return self.shift(x)
 
@@ -112,18 +113,20 @@ class TemporalShift(nn.Module):
         if not is_tensor(self.cache):
             self.cache = x.detach().clone()
 
+        # match shape
+        self.cache = match_shape(self.cache, x).to(x.device)
         # Note: order does matter with stack
-        x = stack((self.cache.to(x.device), x), dim=0) # x.dims -> [2, n, c, w, h]
+        x = stack((self.cache, x), dim=0) # x.dims -> [2, n, c, w, h]
                                           # x -> [cache, x]
 
-        out = zeros_like(x)
+        out = empty_like(self.cache)
         #   t  n  c...
-        out[1, :, :fold] = x[0, :, :fold]  # incorporate channels from cache
-        out[:, :, fold:] = x[:, :, fold:]  # no shift
+        out[:, :fold] = x[0, :, :fold]  # incorporate channels from cache
+        out[:, fold:] = x[1, :, fold:]  # no shift
         
-        self.cache = out[1].detach().clone() # set cache to current frame
+        self.cache = x[1].detach().clone() # set cache to current frame
 
-        return out[1] # current frame after shift
+        return out  # current frame after shift
     
     def offline_shift(self, x):
         _, _, c, _, _ = x.size()

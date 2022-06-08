@@ -30,23 +30,30 @@ except ImportError:
 # Suppress PyTorch warnings
 warnings.filterwarnings('ignore', message='User provided device_type of \'cuda\', but CUDA is not available. Disabling')
 
-
 def match_shape(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     """
     Matches the shape of a to the shape of b if not equal.
     Returns either a or an interpolated a to match shape of b.
     """
-    x, y = list(a.shape), list(b.shape)
+    x, y = [int(i) for i in a.size()], [int(i) for i in b.size()]
+    eps = 0.1
     same = True
     scales = []
-    if x[0] != y[0]: # adjust batch
-        a = a.repeat(y[0], *[1 for _ in x[1:]])
-        x = a.shape
-    for i in range(len(x)):
+    if x[0] < y[0]: # adjust batch
+        diff = y[0] - x[0]
+        n = diff // 2
+        r = diff % 2
+        adjust = (n, n + r)
+        zeros = (len(x) - 1) * 2
+        pad = (*(0 for _ in range(zeros)), *adjust)
+        a = F.pad(a, pad, value=eps)
+    elif x[0] > y[0]:
+        a = b[:y[0]]
+
+    for i in range(2, len(x)):
         scale = y[i]/x[i]
-        if scale != 1.0 or len(x) - i <= 2:
-            same = scale == 1.0 and same
-            scales.append(scale)
+        scales.append(scale)
+        same = scale == 1.0 and same
 
     return a if same else F.interpolate(a, scale_factor=scales, mode='nearest')
 
