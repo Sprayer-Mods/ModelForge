@@ -3,6 +3,7 @@
 
 import math
 from utils.general import LOGGER
+from utils.loss import IOUloss
 from .common import Conv, DWConv
 
 import torch
@@ -53,6 +54,7 @@ class YOLOXHead(nn.Module):
     shapes {cls: [H x W x C], reg: [H x W x 4], IoU: [H x W x 1]}.  
     Uses IoU insead of obj.
     """
+
     def __init__(
         self,
         num_classes,
@@ -74,7 +76,7 @@ class YOLOXHead(nn.Module):
         self.no = self.nc + 5
         self.nl = nl
         self.decode_in_inference = True  # for deploy, set to False
-
+        self.stride = torch.tensor(strides)
 
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
@@ -82,6 +84,14 @@ class YOLOXHead(nn.Module):
         self.reg_preds = nn.ModuleList()
         self.obj_preds = nn.ModuleList()
         self.stems = nn.ModuleList()
+
+        self.origin_preds = []
+        self.x_shifts = []
+        self.y_shifts = []
+        self.expanded_strides = []
+        self.imgs = []
+        self.dtype = torch.float32
+
         conv = DWConv if depthwise else Conv
 
         for i in range(len(in_channels)):
@@ -175,7 +185,7 @@ class YOLOXHead(nn.Module):
         self.strides = strides
         self.grids = [torch.zeros(1)] * len(in_channels)
 
-    def initialize_biases(self, prior_prob):
+    def initialize_biases(self, prior_prob=0.1):
         for conv in self.cls_preds:
             b = conv.bias.view(self.na, -1)
             b.data.fill_(-math.log((1 - prior_prob) / prior_prob))
@@ -188,10 +198,12 @@ class YOLOXHead(nn.Module):
 
     def forward(self, xin, labels=None, imgs=None):
         outputs = []
-        origin_preds = []
-        x_shifts = []
-        y_shifts = []
-        expanded_strides = []
+        self.origin_preds = []
+        self.x_shifts = []
+        self.y_shifts = []
+        self.expanded_strides = []
+        self.imgs = imgs
+        self.dtype = xin[0].dtype
 
         for k, (cls_conv, reg_conv, stride_this_level, x) in enumerate(
             zip(self.cls_convs, self.reg_convs, self.strides, xin)
@@ -212,9 +224,9 @@ class YOLOXHead(nn.Module):
                 output, grid = self.get_output_and_grid(
                     output, k, stride_this_level, xin[0].type()
                 )
-                x_shifts.append(grid[:, :, 0])
-                y_shifts.append(grid[:, :, 1])
-                expanded_strides.append(
+                self.x_shifts.append(grid[:, :, 0])
+                self.y_shifts.append(grid[:, :, 1])
+                self.expanded_strides.append(
                     torch.zeros(1, grid.shape[1])
                     .fill_(stride_this_level)
                     .type_as(xin[0])
@@ -228,7 +240,7 @@ class YOLOXHead(nn.Module):
                     reg_output = reg_output.permute(0, 1, 3, 4, 2).reshape(
                         batch_size, -1, 4
                     )
-                    origin_preds.append(reg_output.clone())
+                    self.origin_preds.append(reg_output.clone())
 
             else:
                 output = torch.cat(
@@ -237,27 +249,28 @@ class YOLOXHead(nn.Module):
 
             outputs.append(output)
 
-        if self.training:
-            return self.get_losses(
-                imgs,
-                x_shifts,
-                y_shifts,
-                expanded_strides,
-                labels,
-                torch.cat(outputs, 1),
-                origin_preds,
-                dtype=xin[0].dtype,
-            )
+        # if self.training:
+        #     # return self.get_losses(
+        #     #     imgs,
+        #     #     x_shifts,
+        #     #     y_shifts,
+        #     #     expanded_strides,
+        #     #     labels,
+        #     #     torch.cat(outputs, 1),
+        #     #     origin_preds,
+        #     #     dtype=xin[0].dtype,
+        #     # )
+        #     return torch.cat(
+        #             [x.flatten(start_dim=2) for x in outputs], dim=2
+        #             ).permute(0, 2, 1)
+        # else:
+        self.hw = [x.shape[-2:] for x in outputs]
+        # [batch, n_anchors_all, nc+5]
+        outputs = torch.cat([x.flatten(start_dim=2) for x in outputs], dim=1)
+        if self.decode_in_inference:
+            return self.decode_outputs(outputs, dtype=xin[0].type())
         else:
-            self.hw = [x.shape[-2:] for x in outputs]
-            # [batch, n_anchors_all, 85]
-            outputs = torch.cat(
-                [x.flatten(start_dim=2) for x in outputs], dim=2
-            ).permute(0, 2, 1)
-            if self.decode_in_inference:
-                return self.decode_outputs(outputs, dtype=xin[0].type())
-            else:
-                return outputs
+            return outputs
 
     def get_output_and_grid(self, output, k, stride, dtype):
         grid = self.grids[k]
@@ -288,9 +301,10 @@ class YOLOXHead(nn.Module):
             grids.append(grid)
             shape = grid.shape[:2]
             strides.append(torch.full((*shape, 1), stride))
-
-        grids = torch.cat(grids, dim=1).type(dtype)
-        strides = torch.cat(strides, dim=1).type(dtype)
+            
+        o_shape = outputs.shape
+        grids = torch.cat(grids, dim=1).reshape(*o_shape[:2], -1).type(dtype)
+        strides = torch.cat(strides, dim=0).reshape(*o_shape[:2], -1).type(dtype)
 
         outputs[..., :2] = (outputs[..., :2] + grids) * strides
         outputs[..., 2:4] = torch.exp(outputs[..., 2:4]) * strides
@@ -298,14 +312,8 @@ class YOLOXHead(nn.Module):
 
     def get_losses(
         self,
-        imgs,
-        x_shifts,
-        y_shifts,
-        expanded_strides,
         labels,
         outputs,
-        origin_preds,
-        dtype,
     ):
         bbox_preds = outputs[:, :, :4]  # [batch, n_anchors_all, 4]
         obj_preds = outputs[:, :, 4].unsqueeze(-1)  # [batch, n_anchors_all, 1]
@@ -315,9 +323,9 @@ class YOLOXHead(nn.Module):
         nlabel = (labels.sum(dim=2) > 0).sum(dim=1)  # number of objects
 
         total_num_anchors = outputs.shape[1]
-        x_shifts = torch.cat(x_shifts, 1)  # [1, n_anchors_all]
-        y_shifts = torch.cat(y_shifts, 1)  # [1, n_anchors_all]
-        expanded_strides = torch.cat(expanded_strides, 1)
+        self.x_shifts = torch.cat(self.x_shifts, 1)  # [1, n_anchors_all]
+        self.y_shifts = torch.cat(self.y_shifts, 1)  # [1, n_anchors_all]
+        self.expanded_strides = torch.cat(self.expanded_strides, 1)
         if self.use_l1:
             origin_preds = torch.cat(origin_preds, 1)
 
@@ -358,14 +366,10 @@ class YOLOXHead(nn.Module):
                         gt_bboxes_per_image,
                         gt_classes,
                         bboxes_preds_per_image,
-                        expanded_strides,
-                        x_shifts,
-                        y_shifts,
                         cls_preds,
                         bbox_preds,
                         obj_preds,
                         labels,
-                        imgs,
                     )
                 except RuntimeError as e:
                     # TODO: the string might change, consider a better way
@@ -391,14 +395,10 @@ class YOLOXHead(nn.Module):
                         gt_bboxes_per_image,
                         gt_classes,
                         bboxes_preds_per_image,
-                        expanded_strides,
-                        x_shifts,
-                        y_shifts,
                         cls_preds,
                         bbox_preds,
                         obj_preds,
                         labels,
-                        imgs,
                         "cpu",
                     )
 
@@ -414,14 +414,14 @@ class YOLOXHead(nn.Module):
                     l1_target = self.get_l1_target(
                         outputs.new_zeros((num_fg_img, 4)),
                         gt_bboxes_per_image[matched_gt_inds],
-                        expanded_strides[0][fg_mask],
-                        x_shifts=x_shifts[0][fg_mask],
-                        y_shifts=y_shifts[0][fg_mask],
+                        self.expanded_strides[0][fg_mask],
+                        x_shifts=self.x_shifts[0][fg_mask],
+                        y_shifts=self.y_shifts[0][fg_mask],
                     )
 
             cls_targets.append(cls_target)
             reg_targets.append(reg_target)
-            obj_targets.append(obj_target.to(dtype))
+            obj_targets.append(obj_target.to(self.dtype))
             fg_masks.append(fg_mask)
             if self.use_l1:
                 l1_targets.append(l1_target)
@@ -452,16 +452,11 @@ class YOLOXHead(nn.Module):
         else:
             loss_l1 = 0.0
 
-        reg_weight = 5.0
-        loss = reg_weight * loss_iou + loss_obj + loss_cls + loss_l1
+        loss = self.imgs.shape[0] * (loss_iou + loss_obj + loss_cls + loss_l1)
 
         return (
             loss,
-            reg_weight * loss_iou,
-            loss_obj,
-            loss_cls,
-            loss_l1,
-            num_fg / max(num_gts, 1),
+            torch.cat((loss_iou, loss_obj, loss_cls, loss_l1))
         )
 
     def get_l1_target(self, l1_target, gt, stride, x_shifts, y_shifts, eps=1e-8):
@@ -480,14 +475,10 @@ class YOLOXHead(nn.Module):
         gt_bboxes_per_image,
         gt_classes,
         bboxes_preds_per_image,
-        expanded_strides,
-        x_shifts,
-        y_shifts,
         cls_preds,
         bbox_preds,
         obj_preds,
         labels,
-        imgs,
         mode="gpu",
     ):
 
@@ -496,9 +487,9 @@ class YOLOXHead(nn.Module):
             gt_bboxes_per_image = gt_bboxes_per_image.cpu().float()
             bboxes_preds_per_image = bboxes_preds_per_image.cpu().float()
             gt_classes = gt_classes.cpu().float()
-            expanded_strides = expanded_strides.cpu().float()
-            x_shifts = x_shifts.cpu()
-            y_shifts = y_shifts.cpu()
+            expanded_strides = self.expanded_strides.cpu().float()
+            x_shifts = self.x_shifts.cpu()
+            y_shifts = self.y_shifts.cpu()
 
         fg_mask, is_in_boxes_and_center = self.get_in_boxes_info(
             gt_bboxes_per_image,
@@ -689,51 +680,3 @@ class YOLOXHead(nn.Module):
             fg_mask_inboxes
         ]
         return num_fg, gt_matched_classes, pred_ious_this_matching, matched_gt_inds
-
-
-
-class IOUloss(nn.Module):
-    def __init__(self, reduction="none", loss_type="iou"):
-        super(IOUloss, self).__init__()
-        self.reduction = reduction
-        self.loss_type = loss_type
-
-    def forward(self, pred, target):
-        assert pred.shape[0] == target.shape[0]
-
-        pred = pred.view(-1, 4)
-        target = target.view(-1, 4)
-        tl = torch.max(
-            (pred[:, :2] - pred[:, 2:] / 2), (target[:, :2] - target[:, 2:] / 2)
-        )
-        br = torch.min(
-            (pred[:, :2] + pred[:, 2:] / 2), (target[:, :2] + target[:, 2:] / 2)
-        )
-
-        area_p = torch.prod(pred[:, 2:], 1)
-        area_g = torch.prod(target[:, 2:], 1)
-
-        en = (tl < br).type(tl.type()).prod(dim=1)
-        area_i = torch.prod(br - tl, 1) * en
-        area_u = area_p + area_g - area_i
-        iou = (area_i) / (area_u + 1e-16)
-
-        if self.loss_type == "iou":
-            loss = 1 - iou ** 2
-        elif self.loss_type == "giou":
-            c_tl = torch.min(
-                (pred[:, :2] - pred[:, 2:] / 2), (target[:, :2] - target[:, 2:] / 2)
-            )
-            c_br = torch.max(
-                (pred[:, :2] + pred[:, 2:] / 2), (target[:, :2] + target[:, 2:] / 2)
-            )
-            area_c = torch.prod(c_br - c_tl, 1)
-            giou = iou - (area_c - area_u) / area_c.clamp(1e-16)
-            loss = 1 - giou.clamp(min=-1.0, max=1.0)
-
-        if self.reduction == "mean":
-            loss = loss.mean()
-        elif self.reduction == "sum":
-            loss = loss.sum()
-
-        return loss
