@@ -303,8 +303,8 @@ class YOLOXHead(nn.Module):
             strides.append(torch.full((*shape, 1), stride))
             
         o_shape = outputs.shape
-        grids = torch.cat(grids, dim=1).reshape(*o_shape[:2], -1).type(dtype)
-        strides = torch.cat(strides, dim=0).reshape(*o_shape[:2], -1).type(dtype)
+        grids = torch.cat(grids, dim=1).reshape((*o_shape[:2], -1)).type(dtype)
+        strides = torch.cat(strides, dim=1).reshape((*o_shape[:2], -1)).type(dtype)
 
         outputs[..., :2] = (outputs[..., :2] + grids) * strides
         outputs[..., 2:4] = torch.exp(outputs[..., 2:4]) * strides
