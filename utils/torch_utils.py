@@ -1,4 +1,5 @@
 # YOLOv5 🚀 by Ultralytics, GPL-3.0 license
+# ModelForge by Sprayer Mods, GPL-3.0 license
 """
 PyTorch utils
 """
@@ -17,6 +18,7 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
+from transformers import RoFormerForQuestionAnswering
 
 from utils.general import LOGGER, file_date, git_describe
 
@@ -28,6 +30,32 @@ except ImportError:
 # Suppress PyTorch warnings
 warnings.filterwarnings('ignore', message='User provided device_type of \'cuda\', but CUDA is not available. Disabling')
 
+def match_shape(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """
+    Matches the shape of a to the shape of b if not equal.
+    Returns either a or an interpolated a to match shape of b.
+    """
+    x, y = [int(i) for i in a.size()], [int(i) for i in b.size()]
+    eps = 0.1
+    same = True
+    scales = []
+    if x[0] < y[0]: # adjust batch
+        diff = y[0] - x[0]
+        n = diff // 2
+        r = diff % 2
+        adjust = (n, n + r)
+        zeros = (len(x) - 1) * 2
+        pad = (*(0 for _ in range(zeros)), *adjust)
+        a = F.pad(a, pad, value=eps)
+    elif x[0] > y[0]:
+        a = b[:y[0]]
+
+    for i in range(2, len(x)):
+        scale = y[i]/x[i]
+        scales.append(scale)
+        same = scale == 1.0 and same
+
+    return a if same else F.interpolate(a, scale_factor=scales, mode='nearest')
 
 @contextmanager
 def torch_distributed_zero_first(local_rank: int):

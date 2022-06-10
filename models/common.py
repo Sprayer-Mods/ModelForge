@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import requests
 import torch
+import torch.functional as F
 import torch.nn as nn
 import yaml
 from PIL import Image
@@ -96,7 +97,6 @@ class TransformerBlock(nn.Module):
         b, _, w, h = x.shape
         p = x.flatten(2).permute(2, 0, 1)
         return self.tr(p + self.linear(p)).permute(1, 2, 0).reshape(b, self.c2, w, h)
-
 
 class Bottleneck(nn.Module):
     # Standard bottleneck
