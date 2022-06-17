@@ -1,15 +1,5 @@
 <div align="center">
-<br>
-<div>
-   <a href="https://github.com/ultralytics/yolov5/actions/workflows/ci-testing.yml"><img src="https://github.com/ultralytics/yolov5/actions/workflows/ci-testing.yml/badge.svg" alt="CI CPU testing"></a>
-   <a href="https://zenodo.org/badge/latestdoi/264818686"><img src="https://zenodo.org/badge/264818686.svg" alt="YOLOv5 Citation"></a>
-   <a href="https://hub.docker.com/r/ultralytics/yolov5"><img src="https://img.shields.io/docker/pulls/ultralytics/yolov5?logo=docker" alt="Docker Pulls"></a>
-   <br>
-   <a href="https://colab.research.google.com/github/ultralytics/yolov5/blob/master/tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
-   <a href="https://www.kaggle.com/ultralytics/yolov5"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open In Kaggle"></a>
-   <a href="https://join.slack.com/t/ultralytics/shared_invite/zt-w29ei8bp-jczz7QYUmDtgo6r6KcMIAg"><img src="https://img.shields.io/badge/Slack-Join_Forum-blue.svg?logo=slack" alt="Join Forum"></a>
-</div>
-
+   <h1>Model Forge</h1>
 <br>
 <p>
 ModelForge, a derivative of Ultralytics' YOLOv5, is a family of object detection architectures and models pretrained on the COCO dataset. It represents a joint <a href="https://ultralytics.com">Ultralytics</a>
@@ -122,28 +112,6 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 
 </details>
 
-## <div align="center">Environments</div>
-
-Get started in seconds with our verified environments. Click each icon below for details.
-
-<div align="center">
-    <a href="https://colab.research.google.com/github/ultralytics/yolov5/blob/master/tutorial.ipynb">
-        <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-colab-small.png" width="15%"/>
-    </a>
-    <a href="https://www.kaggle.com/ultralytics/yolov5">
-        <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-kaggle-small.png" width="15%"/>
-    </a>
-    <a href="https://hub.docker.com/r/ultralytics/yolov5">
-        <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-docker-small.png" width="15%"/>
-    </a>
-    <a href="https://github.com/ultralytics/yolov5/wiki/AWS-Quickstart">
-        <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-aws-small.png" width="15%"/>
-    </a>
-    <a href="https://github.com/ultralytics/yolov5/wiki/GCP-Quickstart">
-        <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-gcp-small.png" width="15%"/>
-    </a>
-</div>
-
 ## <div align="center">Integrations</div>
 
 <div align="center">
@@ -160,15 +128,15 @@ Get started in seconds with our verified environments. Click each icon below for
 |Automatically track and visualize all your YOLOv5 training runs in the cloud with [Weights & Biases](https://wandb.ai/site?utm_campaign=repo_yolo_readme)|Label and export your custom datasets directly to YOLOv5 for training with [Roboflow](https://roboflow.com/?ref=ultralytics) |
 
 
-## <div align="center">Why YOLOv5</div>
+## <div align="center">YOLOv5</div>
 
-<p align="left"><img width="800" src="https://user-images.githubusercontent.com/26833433/155040763-93c22a27-347c-4e3c-847a-8094621d3f4e.png"></p>
-<details>
+<p align="center"><img width="800" src="https://user-images.githubusercontent.com/26833433/155040763-93c22a27-347c-4e3c-847a-8094621d3f4e.png"></p>
+<details align="left">
   <summary>YOLOv5-P5 640 Figure (click to expand)</summary>
 
-<p align="left"><img width="800" src="https://user-images.githubusercontent.com/26833433/155040757-ce0934a3-06a6-43dc-a979-2edbbd69ea0e.png"></p>
+<p align="center"><img width="800" src="https://user-images.githubusercontent.com/26833433/155040757-ce0934a3-06a6-43dc-a979-2edbbd69ea0e.png"></p>
 </details>
-<details>
+<details align="left">
   <summary>Figure Notes (click to expand)</summary>
 
 - **COCO AP val** denotes mAP@0.5:0.95 metric measured on the 5000-image [COCO val2017](http://cocodataset.org) dataset over various inference sizes from 256 to 1536.
@@ -176,6 +144,18 @@ Get started in seconds with our verified environments. Click each icon below for
 - **EfficientDet** data from [google/automl](https://github.com/google/automl) at batch size 8.
 - **Reproduce** by `python val.py --task study --data coco.yaml --iou 0.7 --weights yolov5n6.pt yolov5s6.pt yolov5m6.pt yolov5l6.pt yolov5x6.pt`
 
+</details>
+   
+## <div align="center">Coming Soon: YOLOX</div>
+   <p> Anchorless object detection! </p>
+<p align="center">
+   <img width="800" src="https://user-images.githubusercontent.com/46688118/174135974-41f00231-1f60-4151-b649-18ed9c532613.png">
+   </p>
+<details align="left">
+   <p>
+      <a href="https://github.com/Megvii-BaseDetection/YOLOX">YOLOX Repo</a>
+      <br>
+      <a href="https://arxiv.org/abs/2107.08430">YOLOX Arxiv report</a>
 </details>
 
 ### Pretrained Checkpoints
@@ -195,7 +175,7 @@ Get started in seconds with our verified environments. Click each icon below for
 |[YOLOv5x6][assets]<br>+ [TTA][TTA]|1280<br>1536 |55.0<br>**55.8** |72.7<br>**72.7** |3136<br>- |26.2<br>- |19.4<br>- |140.7<br>- |209.8<br>-
 |More to come...|       |     |       |       |       |       |       |       |
 
-<details>
+<details align="left">
   <summary>Table Notes (click to expand)</summary>
 
 - All checkpoints are trained to 300 epochs with default settings. Nano and Small models use [hyp.scratch-low.yaml](https://github.com/ultralytics/yolov5/blob/master/data/hyps/hyp.scratch-low.yaml) hyps, all others use [hyp.scratch-high.yaml](https://github.com/ultralytics/yolov5/blob/master/data/hyps/hyp.scratch-high.yaml).
@@ -207,14 +187,14 @@ Get started in seconds with our verified environments. Click each icon below for
 
 ## <div align="center">Contribute</div>
 
-We love your input! We want to make contributing to YOLOv5 as easy and transparent as possible. Please see our [Contributing Guide](CONTRIBUTING.md) to get started, and fill out the [YOLOv5 Survey](https://ultralytics.com/survey?utm_source=github&utm_medium=social&utm_campaign=Survey) to send us feedback on your experiences. Thank you to all our contributors!
+We love your input! We want to make contributing to ModelForge as easy and transparent as possible. Please see the YOLOv5 [Contributing Guide](CONTRIBUTING.md) to get started. Thank you to all of the YOLOv5 contributors!
 
 <a href="https://github.com/ultralytics/yolov5/graphs/contributors"><img src="https://opencollective.com/ultralytics/contributors.svg?width=990" /></a>
 
 ## <div align="center">Contact</div>
 
-For YOLOv5 bugs and feature requests please visit [GitHub Issues](https://github.com/ultralytics/yolov5/issues). For business inquiries or
-professional support requests please visit [https://ultralytics.com/contact](https://ultralytics.com/contact).
+For ModelForge bugs and feature requests please visit [GitHub Issues](https://github.com/Sprayer-Mods/ModelForge/issues). For business inquiries or
+professional support requests please visit [https://sprayermods.com/contact](https://sprayermosd.com/contact).
 
 <br>
 
