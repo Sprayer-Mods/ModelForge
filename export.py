@@ -44,6 +44,7 @@ TensorFlow.js:
 
 import argparse
 import json
+from logging import Logger
 import os
 import platform
 import subprocess
@@ -79,6 +80,7 @@ def export_formats():
         ['TorchScript', 'torchscript', '.torchscript', True],
         ['ONNX', 'onnx', '.onnx', True],
         ['OpenVINO', 'openvino', '_openvino_model', False],
+        ['OpenVINO blob', 'blob', '.blob', True],
         ['TensorRT', 'engine', '.engine', True],
         ['CoreML', 'coreml', '.mlmodel', False],
         ['TensorFlow SavedModel', 'saved_model', '_saved_model', True],
@@ -111,6 +113,7 @@ def export_torchscript(model, im, file, optimize, prefix=colorstr('TorchScript:'
 
 def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorstr('ONNX:')):
     # YOLOv5 ONNX export
+    # Modified by SprayerMods
     try:
         check_requirements(('onnx',))
         import onnx
@@ -171,6 +174,8 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
 
 def export_openvino(model, file, half, prefix=colorstr('OpenVINO:')):
     # YOLOv5 OpenVINO export
+    # Modified by SprayerMods
+
     try:
         check_requirements(('openvino-dev',))  # requires openvino-dev: https://pypi.org/project/openvino-dev/
         import openvino.inference_engine as ie
@@ -184,6 +189,80 @@ def export_openvino(model, file, half, prefix=colorstr('OpenVINO:')):
             yaml.dump({'stride': int(max(model.stride)), 'names': model.names}, g)  # add metadata.yaml
 
         LOGGER.info(f'{prefix} export success, saved as {f} ({file_size(f):.1f} MB)')
+        return f
+    except Exception as e:
+        LOGGER.info(f'\n{prefix} export failure: {e}')
+
+
+def export_blob(file, prefix=colorstr('blob:')):
+
+    try:
+        LOGGER.info(f"{prefix} starting blob export...")
+        check_requirements(('blobconverter','onnx'))
+        import blobconverter as bc
+        import onnx
+        
+        f = file.with_suffix('.blob')
+        f_onnx = file.with_suffix('.onnx')
+
+        # pruning https://colab.research.google.com/github/luxonis/depthai-ml-training/blob/master/colab-notebooks/YoloV5_training.ipynb#scrollTo=CB2vWGBkdgzC
+        try:
+            LOGGER.info(f'{prefix} pruning onnx graph for DepthAI YoloDetectionNetwork...')
+            onnx_model = onnx.load(f_onnx)
+
+            conv_indices = []
+            for i, n in enumerate(onnx_model.graph.node):
+                if "Conv" in n.name:
+                    conv_indices.append(i)
+            input1, input2, input3 = conv_indices[-3:]
+
+            sigmoid1 = onnx.helper.make_node(
+                'Sigmoid',
+                inputs=[onnx_model.graph.node[input1].output[0]],
+                outputs=['output1_yolov5'],
+            )
+
+            sigmoid2 = onnx.helper.make_node(
+                'Sigmoid',
+                inputs=[onnx_model.graph.node[input2].output[0]],
+                outputs=['output2_yolov5'],
+            )
+
+            sigmoid3 = onnx.helper.make_node(
+                'Sigmoid',
+                inputs=[onnx_model.graph.node[input3].output[0]],
+                outputs=['output3_yolov5'],
+            )
+
+            onnx_model.graph.node.append(sigmoid1)
+            onnx_model.graph.node.append(sigmoid2)
+            onnx_model.graph.node.append(sigmoid3)
+
+            onnx.save(onnx_model, f_onnx)
+
+        except Exception as e:
+            LOGGER.info(f'\n{prefix} pruning failure: {e}')
+        LOGGER.info(f'{prefix} ONNX pruned successfully')
+        LOGGER.info(f'{prefix} Converting from ONNX to blob')
+
+        # for yolov5s
+        optimizer_params = [
+            "--data_type=FP16",
+            "--input_shape=[1,3,640,640]",
+            "--scale=255", # Scaling to [0,1]
+            # f"--output_dir={f.parent}",
+            "--output=output1_yolov5,output2_yolov5,output3_yolov5",
+            "--reverse_input_channel"
+        ]
+
+        bc.from_onnx(
+            model=str(f_onnx),
+            data_type="FP16",
+            shaves=6,
+            optimizer_params=optimizer_params
+        )
+
+        LOGGER.info(f'{prefix} export success')
         return f
     except Exception as e:
         LOGGER.info(f'\n{prefix} export failure: {e}')
@@ -478,7 +557,7 @@ def run(
     fmts = tuple(export_formats()['Argument'][1:])  # --include arguments
     flags = [x in include for x in fmts]
     assert sum(flags) == len(include), f'ERROR: Invalid --include {include}, valid --include arguments are {fmts}'
-    jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs = flags  # export booleans
+    jit, onnx, xml, blob, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs= flags  # export booleans
     file = Path(url2file(weights) if str(weights).startswith(('http:/', 'https:/')) else weights)  # PyTorch weights
 
     # Load PyTorch model
@@ -497,7 +576,7 @@ def run(
     gs = int(max(model.stride))  # grid size (max stride)
     imgsz = [check_img_size(x, gs) for x in imgsz]  # verify img_size are gs-multiples
     im = torch.zeros(batch_size, 3, *imgsz).to(device)  # image size(1,3,320,192) BCHW iDetection
-
+    
     # Update model
     if half and not coreml and not xml:
         im, model = im.half(), model.half()  # to FP16
@@ -514,25 +593,29 @@ def run(
     LOGGER.info(f"\n{colorstr('PyTorch:')} starting from {file} with output shape {shape} ({file_size(file):.1f} MB)")
 
     # Exports
-    f = [''] * 10  # exported filenames
+    f = [''] * 11  # exported filenames
     warnings.filterwarnings(action='ignore', category=torch.jit.TracerWarning)  # suppress TracerWarning
     if jit:
         f[0] = export_torchscript(model, im, file, optimize)
     if engine:  # TensorRT required before ONNX
         f[1] = export_engine(model, im, file, train, half, simplify, workspace, verbose)
-    if onnx or xml:  # OpenVINO requires ONNX
-        f[2] = export_onnx(model, im, file, opset, train, dynamic, simplify)
+    if onnx:  # OpenVINO requires ONNX
+        f[2] = export_onnx(model, im, file, 13, train, dynamic, simplify)
     if xml:  # OpenVINO
-        f[3] = export_openvino(model, file, half)
+        f[2] = export_onnx(model, im, file, 13, False, False, True)
+        f[3] = export_openvino(model, file, True)
+    if blob: # MYRIAD-X blob
+        f[2] = export_onnx(model, im, file, 13, False, False, True)
+        f[4] = export_blob(file)
     if coreml:
-        _, f[4] = export_coreml(model, im, file, int8, half)
+        _, f[5] = export_coreml(model, im, file, int8, half)
 
     # TensorFlow Exports
     if any((saved_model, pb, tflite, edgetpu, tfjs)):
         if int8 or edgetpu:  # TFLite --int8 bug https://github.com/ultralytics/yolov5/issues/5707
             check_requirements(('flatbuffers==1.12',))  # required before `import tensorflow`
         assert not tflite or not tfjs, 'TFLite and TF.js models must be exported separately, please pass only one type.'
-        model, f[5] = export_saved_model(model.cpu(),
+        model, f[6] = export_saved_model(model.cpu(),
                                          im,
                                          file,
                                          dynamic,
@@ -544,13 +627,13 @@ def run(
                                          conf_thres=conf_thres,
                                          keras=keras)
         if pb or tfjs:  # pb prerequisite to tfjs
-            f[6] = export_pb(model, file)
+            f[7] = export_pb(model, file)
         if tflite or edgetpu:
-            f[7] = export_tflite(model, im, file, int8=int8 or edgetpu, data=data, nms=nms, agnostic_nms=agnostic_nms)
+            f[8] = export_tflite(model, im, file, int8=int8 or edgetpu, data=data, nms=nms, agnostic_nms=agnostic_nms)
         if edgetpu:
-            f[8] = export_edgetpu(file)
+            f[9] = export_edgetpu(file)
         if tfjs:
-            f[9] = export_tfjs(file)
+            f[10] = export_tfjs(file)
 
     # Finish
     f = [str(x) for x in f if x]  # filter out '' and None
@@ -591,7 +674,7 @@ def parse_opt():
     parser.add_argument('--include',
                         nargs='+',
                         default=['torchscript', 'onnx'],
-                        help='torchscript, onnx, openvino, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs')
+                        help='torchscript, onnx, openvino, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, blob')
     opt = parser.parse_args()
     print_args(vars(opt))
     return opt

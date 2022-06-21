@@ -1,0 +1,19 @@
+@inproceedings{he2021end,
+  title={End-to-End Video Object Detection with Spatial-Temporal Transformers},
+  author={He, Lu and Zhou, Qianyu and Li, Xiangtai and Niu, Li and Cheng, Guangliang and Li, Xiao and Liu, Wenxuan and Tong, Yunhai and Ma, Lizhuang and Zhang, Liqing},
+  booktitle={Proceedings of the 29th ACM International Conference on Multimedia},
+  pages={1507--1516},
+  year={2021}
+}
+@article{zhou2022transvod,
+  title={TransVOD: End-to-end Video Object Detection with Spatial-Temporal Transformers},
+  author={Zhou, Qianyu and Li, Xiangtai and He, Lu and Yang, Yibo and Cheng, Guangliang and Tong, Yunhai and Ma, Lizhuang and Tao, Dacheng},
+  journal={arXiv preprint arXiv:2201.05047},
+  year={2022}
+}
+@inproceedings{lin2019tsm,
+  title={TSM: Temporal Shift Module for Efficient Video Understanding},
+  author={Lin, Ji and Gan, Chuang and Han, Song},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  year={2019}
+} 
