@@ -1,4 +1,4 @@
-# Sprayer Mods modification - GPL-3.0 license
+# Sprayer Mods - GPL-3.0 license
 
 path: "datasets/sequential_soy"
 train: "train.txt"

@@ -322,7 +322,7 @@ class DetectMultiBackend(nn.Module):
 
         super().__init__()
         w = str(weights[0] if isinstance(weights, list) else weights)
-        pt, jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs = self.model_type(w)  # get backend
+        pt, jit, onnx, xml, blob, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs = self.model_type(w)  # get backend
         w = attempt_download(w)  # download if not local
         fp16 &= (pt or jit or onnx or engine) and device.type != 'cpu'  # FP16
         stride, names = 32, [f'class{i}' for i in range(1000)]  # assign defaults
@@ -511,10 +511,10 @@ class DetectMultiBackend(nn.Module):
         suffixes = list(export_formats().Suffix) + ['.xml']  # export suffixes
         check_suffix(p, suffixes)  # checks
         p = Path(p).name  # eliminate trailing separators
-        pt, jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, xml2 = (s in p for s in suffixes)
+        pt, jit, onnx, xml, blob, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, xml2 = (s in p for s in suffixes)
         xml |= xml2  # *_openvino_model or *.xml
         tflite &= not edgetpu  # *.tflite
-        return pt, jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs
+        return pt, jit, onnx, blob, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs
 
     @staticmethod
     def _load_metadata(f='path/to/meta.yaml'):

@@ -119,8 +119,9 @@ class Model(nn.Module):
         self.names = [str(i) for i in range(self.yaml['nc'])]  # default names
         self.inplace = self.yaml.get('inplace', True)
 
+        self.yolox = False
         # Build strides, anchors
-        m = self.model[-1]  # Detect()
+        m = self.model[-1]  # Detect() or YoloXHead()
         if isinstance(m, Detect):
             s = 256  # 2x min stride
             m.inplace = self.inplace
@@ -129,6 +130,12 @@ class Model(nn.Module):
             m.anchors /= m.stride.view(-1, 1, 1)
             self.stride = m.stride
             self._initialize_biases()  # only run once
+        if isinstance(m, YOLOXHead):
+            s = 256
+            self.yolox = True
+            self.stride = m.stride
+            self.inplace = False
+            m.initialize_biases()
 
         # Init weights, biases
         initialize_weights(self)

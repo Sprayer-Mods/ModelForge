@@ -51,7 +51,7 @@ from utils.general import (LOGGER, check_amp, check_dataset, check_file, check_g
                            labels_to_image_weights, methods, one_cycle, print_args, print_mutation, strip_optimizer)
 from utils.loggers import Loggers
 from utils.loggers.wandb.wandb_utils import check_wandb_resume
-from utils.loss import ComputeLoss
+from utils.loss import ComputeLoss, ComputeYOLOXLoss
 from utils.metrics import fitness
 from utils.plots import plot_evolve, plot_labels
 from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
@@ -295,7 +295,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
     stopper = EarlyStopping(patience=opt.patience)
-    compute_loss = ComputeLoss(model)  # init loss class
+
+    compute_loss = ComputeYOLOXLoss(model) if model.yolox else ComputeLoss(model)# init loss class
     callbacks.run('on_train_start')
     LOGGER.info(f'Image sizes {imgsz} train, {imgsz} val\n'
                 f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'

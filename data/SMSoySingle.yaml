@@ -1,8 +1,8 @@
 # Sprayer Mods - GPL-3.0 license
 
-path: "datasets/corn"
-train: "corn_train.txt"
-val: "corn_val.txt"
+path: "datasets/soy"
+train: "crops_train.txt"
+val: "crops_valid.txt"
 # test: ""
 
 nc: 3
