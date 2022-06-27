@@ -59,9 +59,11 @@ class YOLOXHead(nn.Module):
         self,
         num_classes,
         nl,
-        width=1.0,
+        width=0.5, # Hard coding width to match for now. Should be pulled from some
+        #where though
         strides=[8, 16, 32],
         in_channels=[256, 512, 1024],
+        # in_channels = [128,256,1024],
         depthwise=False,
     ):
         """
@@ -77,6 +79,8 @@ class YOLOXHead(nn.Module):
         self.nl = nl
         self.decode_in_inference = True  # for deploy, set to False
         self.stride = torch.tensor(strides)
+        self.head_size = 256 #I think the size of the stems at the YOLOXHEAD
+        # are too large for the yolox-s
 
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
@@ -93,13 +97,13 @@ class YOLOXHead(nn.Module):
         self.dtype = torch.float32
 
         conv = DWConv if depthwise else Conv
-
+        print('WIDTH: ', width)
         for i in range(len(in_channels)):
             # Stem--------------------------------------------------------------
             self.stems.append(
                 Conv(
                     c1=int(in_channels[i] * width),
-                    c2=int(256 * width),
+                    c2=int(self.head_size * width),
                     k=1,
                     s=1,
                     act=True,
@@ -110,15 +114,15 @@ class YOLOXHead(nn.Module):
                 nn.Sequential(
                     *[
                         conv(
-                            c1=int(256 * width),
-                            c2=int(256 * width),
+                            c1=int(self.head_size * width),
+                            c2=int(self.head_size * width),
                             k=3,
                             s=1,
                             act=True,
                         ),
                         conv(
-                            c1=int(256 * width),
-                            c2=int(256 * width),
+                            c1=int(self.head_size * width),
+                            c2=int(self.head_size * width),
                             k=3,
                             s=1,
                             act=True,
@@ -131,15 +135,15 @@ class YOLOXHead(nn.Module):
                 nn.Sequential(
                     *[
                         conv(
-                            c1=int(256 * width),
-                            c2=int(256 * width),
+                            c1=int(self.head_size * width),
+                            c2=int(self.head_size * width),
                             k=3,
                             s=1,
                             act=True,
                         ),
                         conv(
-                            c1=int(256 * width),
-                            c2=int(256 * width),
+                            c1=int(self.head_size * width),
+                            c2=int(self.head_size * width),
                             k=3,
                             s=1,
                             act=True,
@@ -150,7 +154,7 @@ class YOLOXHead(nn.Module):
             # Cls pred-----------------------------------------------------------
             self.cls_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256 * width),
+                    in_channels=int(self.head_size * width),
                     out_channels=self.na * self.nc,
                     kernel_size=1,
                     stride=1,
@@ -160,7 +164,7 @@ class YOLOXHead(nn.Module):
             # Reg pred----------------------------------------------------------
             self.reg_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256 * width),
+                    in_channels=int(self.head_size * width),
                     out_channels=4,
                     kernel_size=1,
                     stride=1,
@@ -170,7 +174,7 @@ class YOLOXHead(nn.Module):
             # Obj pred----------------------------------------------------------
             self.obj_preds.append(
                 nn.Conv2d(
-                    in_channels=int(256 * width),
+                    in_channels=int(self.head_size * width),
                     out_channels=self.na * 1,
                     kernel_size=1,
                     stride=1,
@@ -249,28 +253,28 @@ class YOLOXHead(nn.Module):
 
             outputs.append(output)
 
-        # if self.training:
-        #     # return self.get_losses(
-        #     #     imgs,
-        #     #     x_shifts,
-        #     #     y_shifts,
-        #     #     expanded_strides,
-        #     #     labels,
-        #     #     torch.cat(outputs, 1),
-        #     #     origin_preds,
-        #     #     dtype=xin[0].dtype,
-        #     # )
-        #     return torch.cat(
-        #             [x.flatten(start_dim=2) for x in outputs], dim=2
-        #             ).permute(0, 2, 1)
-        # else:
-        self.hw = [x.shape[-2:] for x in outputs]
-        # [batch, n_anchors_all, nc+5]
-        outputs = torch.cat([x.flatten(start_dim=2) for x in outputs], dim=1)
-        if self.decode_in_inference:
-            return self.decode_outputs(outputs, dtype=xin[0].type())
+        if self.training:
+            # return self.get_losses(
+            #     imgs,
+            #     x_shifts,
+            #     y_shifts,
+            #     expanded_strides,
+            #     labels,
+            #     torch.cat(outputs, 1),
+            #     origin_preds,
+            #     dtype=xin[0].dtype,
+            # )
+            return torch.cat(outputs, 1)
         else:
-            return outputs
+            self.hw = [x.shape[-2:] for x in outputs]
+            # [batch, n_anchors_all, nc+5]
+            # outputs = torch.cat([x.flatten(start_dim=2) for x in outputs], dim=1)
+            outputs = torch.cat([x.flatten(start_dim=2) for x in outputs], dim=2
+            ).permute(0,2,1)
+            if self.decode_in_inference:
+                return self.decode_outputs(outputs, dtype=xin[0].type())
+            else:
+                return outputs
 
     def get_output_and_grid(self, output, k, stride, dtype):
         grid = self.grids[k]

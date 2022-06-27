@@ -236,7 +236,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     mlc = int(np.concatenate(dataset.labels, 0)[:, 0].max())  # max label class
     nb = len(train_loader)  # number of batches
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
-
     # Process 0
     if RANK in {-1, 0}:
         val_loader = create_dataloader(val_path,
@@ -253,13 +252,19 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                        prefix=colorstr('val: '))[0]
 
         if not resume:
+            if model.yolox:
+                maxNumObjects = 120
+                counter = 0
+                for l in range(len(dataset.labels)):
+                    l = np.concatenate((dataset.labels[l], np.zeros((maxNumObjects, 5))), axis = 0)
             labels = np.concatenate(dataset.labels, 0)
+
+
             # c = torch.tensor(labels[:, 0])  # classes
             # cf = torch.bincount(c.long(), minlength=nc) + 1.  # frequency
             # model._initialize_biases(cf.to(device))
             if plots:
                 plot_labels(labels, names, save_dir)
-
             # Anchors
             if not opt.noautoanchor:
                 check_anchors(dataset, model=model, thr=hyp['anchor_t'], imgsz=imgsz)
