@@ -234,6 +234,23 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                               prefix=colorstr('train: '),
                                               shuffle=True)
     mlc = int(np.concatenate(dataset.labels, 0)[:, 0].max())  # max label class
+    # if model.yolox:
+    #     print('train yolox')
+    #     numObjs = {}
+    #     for i, (img, label, path, _) in enumerate(train_loader.dataset):
+    #         # print(i, path, len(label), label)
+    #         numObjs[path] = len(label)
+        # numObjs = {}
+        # for i, imLabs in enumerate(train_loader.dataset.labels):
+        #     print(imLabs)
+        #     numObjs[i] = len(imLabs)
+        # maxNumObjects = 120
+        # trainLabels = torch.empty(len(train_loader.dataset.labels), maxNumObjects, 5)
+        # for i, imLabs in enumerate(train_loader.dataset.labels):
+        #     j = np.concatenate((imLabs, np.zeros((maxNumObjects - len(imLabs), 5))), axis = 0)
+        #     trainLabels[i:(i+1),:,:] = torch.tensor(j)
+        # train_loader.dataset.labels_x = trainLabels
+
     nb = len(train_loader)  # number of batches
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
     # Process 0
@@ -252,11 +269,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                        prefix=colorstr('val: '))[0]
 
         if not resume:
-            if model.yolox:
-                maxNumObjects = 120
-                counter = 0
-                for l in range(len(dataset.labels)):
-                    l = np.concatenate((dataset.labels[l], np.zeros((maxNumObjects, 5))), axis = 0)
+            # if model.yolox:
+            #     maxNumObjects = 120
+            #     labels = torch.empty(len(dataset.labels), maxNumObjects, 5)
+            #     for i, imLabs in enumerate(dataset.labels):
+            #         j = np.concatenate((imLabs, np.zeros((maxNumObjects - len(imLabs), 5))), axis = 0)
+            #         labels[i:(i+1),:,:] = torch.tensor(j)
+            # else:
             labels = np.concatenate(dataset.labels, 0)
 
 
@@ -320,8 +339,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         # Update mosaic border (optional)
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
         # dataset.mosaic_border = [b - imgsz, -b]  # height, width borders
-
-        mloss = torch.zeros(3, device=device)  # mean losses
+        # mloss = torch.zeros(3, device=device)
+        mloss = torch.zeros(4, device=device) if model.yolox else torch.zeros(3, device=device)
+        # mean losses
+        # Could be reduced to one thing with 3 values.
+        # I included the l1 loss in the yolox because it was there
+        # wouldn't be hard to remove if we aren't going to use it
         if RANK != -1:
             train_loader.sampler.set_epoch(epoch)
         pbar = enumerate(train_loader)
@@ -360,7 +383,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
                 if opt.quad:
-                    loss *= 4.
+                    loss *= 4. #Why x4? it looked like that was already beign done on the other side of things...
 
             # Backward
             scaler.scale(loss).backward()
@@ -379,7 +402,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G'  # (GB)
                 pbar.set_description(('%10s' * 2 + '%10.4g' * 5) %
-                                     (f'{epoch}/{epochs - 1}', mem, *mloss, targets.shape[0], imgs.shape[-1]))
+                                     (f'{epoch}/{epochs - 1}', mem, *mloss[0:3], targets.shape[0], imgs.shape[-1]))
                 callbacks.run('on_train_batch_end', ni, model, imgs, targets, paths, plots)
                 if callbacks.stop_training:
                     return

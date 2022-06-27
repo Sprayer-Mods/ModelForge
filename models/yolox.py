@@ -2,6 +2,7 @@
 # Apache 2.0 license
 
 import math
+import numpy as np
 from utils.general import LOGGER
 from utils.loss import IOUloss
 from .common import Conv, DWConv
@@ -97,7 +98,7 @@ class YOLOXHead(nn.Module):
         self.dtype = torch.float32
 
         conv = DWConv if depthwise else Conv
-        print('WIDTH: ', width)
+
         for i in range(len(in_channels)):
             # Stem--------------------------------------------------------------
             self.stems.append(
@@ -306,10 +307,11 @@ class YOLOXHead(nn.Module):
             shape = grid.shape[:2]
             strides.append(torch.full((*shape, 1), stride))
             
-        o_shape = outputs.shape
-        grids = torch.cat(grids, dim=1).reshape((*o_shape[:2], -1)).type(dtype)
-        strides = torch.cat(strides, dim=1).reshape((*o_shape[:2], -1)).type(dtype)
-
+        # o_shape = outputs.shape
+        # grids = torch.cat(grids, dim=1).reshape((*o_shape[:2], -1)).type(dtype)
+        # strides = torch.cat(strides, dim=1).reshape((*o_shape[:2], -1)).type(dtype)
+        grids = torch.cat(grids, dim=1).type(dtype)
+        strides = torch.cat(strides, dim=1).type(dtype)
         outputs[..., :2] = (outputs[..., :2] + grids) * strides
         outputs[..., 2:4] = torch.exp(outputs[..., 2:4]) * strides
         return outputs
@@ -317,14 +319,19 @@ class YOLOXHead(nn.Module):
     def get_losses(
         self,
         labels,
-        outputs,
+        outputs
     ):
         bbox_preds = outputs[:, :, :4]  # [batch, n_anchors_all, 4]
         obj_preds = outputs[:, :, 4].unsqueeze(-1)  # [batch, n_anchors_all, 1]
         cls_preds = outputs[:, :, 5:]  # [batch, n_anchors_all, n_cls]
-
-        # calculate targets
-        nlabel = (labels.sum(dim=2) > 0).sum(dim=1)  # number of objects
+    
+        # nlabel = (labels.sum(dim=2) > 0).sum(dim=1)  # number of objects
+        nlabel = {}
+        for i in labels[:,0]:
+            if i.item() in nlabel:
+                nlabel[i.item()] += 1
+            else:
+                nlabel[i.item()] = 1
 
         total_num_anchors = outputs.shape[1]
         self.x_shifts = torch.cat(self.x_shifts, 1)  # [1, n_anchors_all]
@@ -342,7 +349,8 @@ class YOLOXHead(nn.Module):
         num_fg = 0.0
         num_gts = 0.0
 
-        for batch_idx in range(outputs.shape[0]):
+        # for batch_idx in range(outputs.shape[0]):
+        for batch_idx in nlabel:
             num_gt = int(nlabel[batch_idx])
             num_gts += num_gt
             if num_gt == 0:
@@ -352,9 +360,12 @@ class YOLOXHead(nn.Module):
                 obj_target = outputs.new_zeros((total_num_anchors, 1))
                 fg_mask = outputs.new_zeros(total_num_anchors).bool()
             else:
-                gt_bboxes_per_image = labels[batch_idx, :num_gt, 1:5]
-                gt_classes = labels[batch_idx, :num_gt, 0]
-                bboxes_preds_per_image = bbox_preds[batch_idx]
+                # gt_bboxes_per_image = labels[batch_idx, :num_gt, 1:5] # :numgt will need to change to a range for current idx, change to 2-6
+                # gt_classes = labels[batch_idx, :num_gt, 0] #change to 1
+                # bboxes_preds_per_image = bbox_preds[batch_idx]
+                gt_bboxes_per_image = labels[(labels[:,0] == batch_idx)][:, 2:6]
+                gt_classes = labels[(labels[:,0] == batch_idx)][:, 1]
+                bboxes_preds_per_image = bbox_preds[int(batch_idx)]
 
                 try:
                     (
@@ -364,7 +375,7 @@ class YOLOXHead(nn.Module):
                         matched_gt_inds,
                         num_fg_img,
                     ) = self.get_assignments(  # noqa
-                        batch_idx,
+                        int(batch_idx),
                         num_gt,
                         total_num_anchors,
                         gt_bboxes_per_image,
@@ -393,7 +404,7 @@ class YOLOXHead(nn.Module):
                         matched_gt_inds,
                         num_fg_img,
                     ) = self.get_assignments(  # noqa
-                        batch_idx,
+                        int(batch_idx),
                         num_gt,
                         total_num_anchors,
                         gt_bboxes_per_image,
@@ -454,13 +465,18 @@ class YOLOXHead(nn.Module):
                 self.l1_loss(origin_preds.view(-1, 4)[fg_masks], l1_targets)
             ).sum() / num_fg
         else:
-            loss_l1 = 0.0
+            loss_l1 = torch.tensor(0.0, device  = 'cuda:0')
+            #loss_l1 = torch.tensor(0.0, device='cuda:0')
 
-        loss = self.imgs.shape[0] * (loss_iou + loss_obj + loss_cls + loss_l1)
-
+        # loss = self.imgs.shape[0] * (loss_iou + loss_obj + loss_cls + loss_l1)
+        # loss = len(nlabel) * (loss_iou + loss_obj + loss_cls + loss_l1)
+        reg_weight = len(nlabel) # weight by batch size. Original used 5, but it blow up. This didn't
+        loss = reg_weight * (loss_iou) + loss_obj + loss_cls + loss_l1
+        comb = torch.stack((loss_iou, loss_obj, loss_cls, loss_l1)) #Apparently torch.cat doesn't work with 0-dim tensors
         return (
             loss,
-            torch.cat((loss_iou, loss_obj, loss_cls, loss_l1))
+            comb
+            #torch.cat((loss_iou, loss_obj, loss_cls, loss_l1))
         )
 
     def get_l1_target(self, l1_target, gt, stride, x_shifts, y_shifts, eps=1e-8):
@@ -494,6 +510,10 @@ class YOLOXHead(nn.Module):
             expanded_strides = self.expanded_strides.cpu().float()
             x_shifts = self.x_shifts.cpu()
             y_shifts = self.y_shifts.cpu()
+        else:
+            x_shifts = self.x_shifts
+            y_shifts = self.y_shifts
+            expanded_strides = self.expanded_strides
 
         fg_mask, is_in_boxes_and_center = self.get_in_boxes_info(
             gt_bboxes_per_image,
