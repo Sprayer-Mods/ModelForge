@@ -234,22 +234,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                               prefix=colorstr('train: '),
                                               shuffle=True)
     mlc = int(np.concatenate(dataset.labels, 0)[:, 0].max())  # max label class
-    # if model.yolox:
-    #     print('train yolox')
-    #     numObjs = {}
-    #     for i, (img, label, path, _) in enumerate(train_loader.dataset):
-    #         # print(i, path, len(label), label)
-    #         numObjs[path] = len(label)
-        # numObjs = {}
-        # for i, imLabs in enumerate(train_loader.dataset.labels):
-        #     print(imLabs)
-        #     numObjs[i] = len(imLabs)
-        # maxNumObjects = 120
-        # trainLabels = torch.empty(len(train_loader.dataset.labels), maxNumObjects, 5)
-        # for i, imLabs in enumerate(train_loader.dataset.labels):
-        #     j = np.concatenate((imLabs, np.zeros((maxNumObjects - len(imLabs), 5))), axis = 0)
-        #     trainLabels[i:(i+1),:,:] = torch.tensor(j)
-        # train_loader.dataset.labels_x = trainLabels
 
     nb = len(train_loader)  # number of batches
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
@@ -265,19 +249,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                        rect=True,
                                        rank=-1,
                                        workers=workers * 2,
-                                       pad=0.5,
+                                       pad=0, # This was 0.5, but caused things to break
                                        prefix=colorstr('val: '))[0]
 
         if not resume:
-            # if model.yolox:
-            #     maxNumObjects = 120
-            #     labels = torch.empty(len(dataset.labels), maxNumObjects, 5)
-            #     for i, imLabs in enumerate(dataset.labels):
-            #         j = np.concatenate((imLabs, np.zeros((maxNumObjects - len(imLabs), 5))), axis = 0)
-            #         labels[i:(i+1),:,:] = torch.tensor(j)
-            # else:
             labels = np.concatenate(dataset.labels, 0)
-
 
             # c = torch.tensor(labels[:, 0])  # classes
             # cf = torch.bincount(c.long(), minlength=nc) + 1.  # frequency
@@ -326,6 +302,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'
                 f"Logging results to {colorstr('bold', save_dir)}\n"
                 f'Starting training for {epochs} epochs...')
+
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         callbacks.run('on_train_epoch_start')
         model.train()
@@ -433,7 +410,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             fi = fitness(np.array(results).reshape(1, -1))  # weighted combination of [P, R, mAP@.5, mAP@.5-.95]
             if fi > best_fitness:
                 best_fitness = fi
-            log_vals = list(mloss) + list(results) + lr
+            log_vals = list(mloss.data[:3]) + list(results[:7]) + lr
             callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
 
             # Save model

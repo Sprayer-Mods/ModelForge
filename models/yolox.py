@@ -60,11 +60,9 @@ class YOLOXHead(nn.Module):
         self,
         num_classes,
         nl,
-        width=0.5, # Hard coding width to match for now. Should be pulled from some
-        #where though
+        width,
         strides=[8, 16, 32],
-        in_channels=[256, 512, 1024],
-        # in_channels = [128,256,1024],
+        in_channels=[256, 512, 1024], #using width = 0.5 makes in_channels = [128,256,512] to match yolox_s
         depthwise=False,
     ):
         """
@@ -80,8 +78,7 @@ class YOLOXHead(nn.Module):
         self.nl = nl
         self.decode_in_inference = True  # for deploy, set to False
         self.stride = torch.tensor(strides)
-        self.head_size = 256 #I think the size of the stems at the YOLOXHEAD
-        # are too large for the yolox-s
+        self.head_size = 256
 
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
@@ -270,10 +267,11 @@ class YOLOXHead(nn.Module):
             self.hw = [x.shape[-2:] for x in outputs]
             # [batch, n_anchors_all, nc+5]
             # outputs = torch.cat([x.flatten(start_dim=2) for x in outputs], dim=1)
+            expanded_outputs = [x.permute(0,2,3,1) for x in outputs]
             outputs = torch.cat([x.flatten(start_dim=2) for x in outputs], dim=2
             ).permute(0,2,1)
             if self.decode_in_inference:
-                return self.decode_outputs(outputs, dtype=xin[0].type())
+                return self.decode_outputs(outputs, dtype=xin[0].type()), expanded_outputs
             else:
                 return outputs
 
@@ -321,22 +319,28 @@ class YOLOXHead(nn.Module):
         labels,
         outputs
     ):
+
         bbox_preds = outputs[:, :, :4]  # [batch, n_anchors_all, 4]
         obj_preds = outputs[:, :, 4].unsqueeze(-1)  # [batch, n_anchors_all, 1]
         cls_preds = outputs[:, :, 5:]  # [batch, n_anchors_all, n_cls]
     
         # nlabel = (labels.sum(dim=2) > 0).sum(dim=1)  # number of objects
-        nlabel = {}
+        nlabel = {i:0 for i in range(bbox_preds.shape[0])}
         for i in labels[:,0]:
-            if i.item() in nlabel:
-                nlabel[i.item()] += 1
-            else:
-                nlabel[i.item()] = 1
+            nlabel[int(i.item())] += 1
+            # if i.item() in nlabel:
+            #     nlabel[i.item()] += 1
+            # else:
+                # nlabel[i.item()] = 1
 
         total_num_anchors = outputs.shape[1]
-        self.x_shifts = torch.cat(self.x_shifts, 1)  # [1, n_anchors_all]
-        self.y_shifts = torch.cat(self.y_shifts, 1)  # [1, n_anchors_all]
-        self.expanded_strides = torch.cat(self.expanded_strides, 1)
+        # On validation step already had these as tensors rather than lists
+        if type(self.x_shifts) is list:
+            self.x_shifts = torch.cat(self.x_shifts, 1)  # [1, n_anchors_all]
+        if type(self.y_shifts) is list:
+            self.y_shifts = torch.cat(self.y_shifts, 1)  # [1, n_anchors_all]
+        if type(self.expanded_strides) is list:
+            self.expanded_strides = torch.cat(self.expanded_strides, 1)
         if self.use_l1:
             origin_preds = torch.cat(origin_preds, 1)
 
@@ -449,21 +453,22 @@ class YOLOXHead(nn.Module):
             l1_targets = torch.cat(l1_targets, 0)
 
         num_fg = max(num_fg, 1)
+
         loss_iou = (
-            self.iou_loss(bbox_preds.view(-1, 4)[fg_masks], reg_targets)
-        ).sum() / num_fg
+            self.iou_loss(bbox_preds.reshape(-1, 4)[fg_masks], reg_targets)
+        ).sum() / num_fg # Was bbox_preds.view(), had to change to reshape for some reason
         loss_obj = (
-            self.bcewithlog_loss(obj_preds.view(-1, 1), obj_targets)
-        ).sum() / num_fg
+            self.bcewithlog_loss(obj_preds.reshape(-1, 1), obj_targets)
+        ).sum() / num_fg # Was obj_preds.view(), had to change to reshape for some reason
         loss_cls = (
             self.bcewithlog_loss(
-                cls_preds.view(-1, self.nc)[fg_masks], cls_targets
-            )
-        ).sum() / num_fg
+                cls_preds.reshape(-1, self.nc)[fg_masks], cls_targets
+            ) 
+        ).sum() / num_fg # Was cls_preds.view(), had to change to reshape for some reason
         if self.use_l1:
             loss_l1 = (
-                self.l1_loss(origin_preds.view(-1, 4)[fg_masks], l1_targets)
-            ).sum() / num_fg
+                self.l1_loss(origin_preds.reshape(-1, 4)[fg_masks], l1_targets)
+            ).sum() / num_fg # Was cls_preds.view(), had to change to reshape for some reason
         else:
             loss_l1 = torch.tensor(0.0, device  = 'cuda:0')
             #loss_l1 = torch.tensor(0.0, device='cuda:0')

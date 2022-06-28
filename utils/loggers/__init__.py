@@ -137,7 +137,7 @@ class Loggers():
             n = len(x) + 1  # number of cols
             s = '' if file.exists() else (('%20s,' * n % tuple(['epoch'] + self.keys)).rstrip(',') + '\n')  # add header
             with open(file, 'a') as f:
-                f.write(s + ('%20.5g,' * n % tuple([epoch] + vals)).rstrip(',') + '\n')
+                f.write(s + ('%20.5g,' * n % tuple([epoch] + vals)).rstrip(',') + '\n') #:8 is not right
 
         if self.tb:
             for k, v in x.items():

@@ -4,7 +4,7 @@
 nc: 80  # number of classes
 nl: 2  # number of detection layers
 depth_multiple: 1  # model depth multiple
-width_multiple: 0.5  # layer channel multiple
+width_multiple: 0.5  # layer channel multiple - 0.5 corresponds to yolox_s
 # anchors:
 #  - [10,13, 16,30, 33,23]  # P3/8
 #  - [30,61, 62,45, 59,119]  # P4/16
