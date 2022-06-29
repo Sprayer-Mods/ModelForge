@@ -242,9 +242,9 @@ class ComputeYOLOXLoss:
         self.yoloxhead = model.model[-1]
 
     def __call__(self, p, targets):
-        self.yoloxhead.get_losses(
+        return self.yoloxhead.get_losses(
             labels=targets,
-            outputs=p,
+            outputs=p
         )
 
     def build_targets(self, p, targets):

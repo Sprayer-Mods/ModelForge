@@ -309,7 +309,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         elif m is Expand:
             c2 = ch[f] // args[0] ** 2
         elif m is YOLOXHead:  # Not currently functional
-            args = [nc, nl]
+            args = [nc, nl, gw]
         else:
             c2 = ch[f]
 

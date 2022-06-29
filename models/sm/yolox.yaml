@@ -1,10 +1,9 @@
 # ModelForge by Sprayer Mods, GPL-3.0 license
 
-nc: 3  # number of classes
+nc: 80  # number of classes
 nl: 2  # number of detection layers
 depth_multiple: 1.0  # model depth multiple
-width_multiple: 1.0  # layer channel multiple
-
+width_multiple: 0.5  # layer channel multiple
 
 # YOLOv3-tiny backbone
 backbone:
