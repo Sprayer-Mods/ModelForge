@@ -62,9 +62,9 @@ WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
 
 
 def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictionary
-    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze = \
+    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, freeze, noanchors = \
         Path(opt.save_dir), opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
-        opt.resume, opt.noval, opt.nosave, opt.workers, opt.freeze
+        opt.resume, opt.noval, opt.nosave, opt.workers, opt.freeze, opt.noanchors
     callbacks.run('on_pretrain_routine_start')
 
     # Directories
@@ -261,7 +261,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if plots:
                 plot_labels(labels, names, save_dir)
             # Anchors
-            if not opt.noautoanchor:
+            if not opt.noautoanchor and not noanchors:
                 check_anchors(dataset, model=model, thr=hyp['anchor_t'], imgsz=imgsz)
             model.half().float()  # pre-reduce anchor precision
 
@@ -522,6 +522,9 @@ def parse_opt(known=False):
     parser.add_argument('--bbox_interval', type=int, default=-1, help='W&B: Set bounding-box image logging interval')
     parser.add_argument('--artifact_alias', type=str, default='latest', help='W&B: Version of dataset artifact to use')
 
+    # Added arguments
+    parser.add_argument('--noanchors', action='store_true', help='If you\'re using an end-to-end model with no anchors, use this flag')
+
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
@@ -609,7 +612,7 @@ def main(opt, callbacks=Callbacks()):
 
         with open(opt.hyp, errors='ignore') as f:
             hyp = yaml.safe_load(f)  # load hyps dict
-            if 'anchors' not in hyp:  # anchors commented in hyp.yaml
+            if 'anchors' not in hyp and not opt.noanchors:  # anchors commented in hyp.yaml
                 hyp['anchors'] = 3
         opt.noval, opt.nosave, save_dir = True, True, Path(opt.save_dir)  # only val/save final epoch
         # ei = [isinstance(x, (int, float)) for x in hyp.values()]  # evolvable indices
