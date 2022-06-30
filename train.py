@@ -1,4 +1,5 @@
 # YOLOv5 🚀 by Ultralytics, GPL-3.0 license
+# ModelForge by Sprayer Mods, GPL-3.0 license
 """
 Train a YOLOv5 model on a custom dataset.
 
@@ -39,6 +40,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 import val  # for end-of-epoch mAP
 from models.experimental import attempt_load
+from models.video import VideoModel
 from models.yolo import Model
 from utils.autoanchor import check_anchors
 from utils.autobatch import check_train_batch_size
@@ -106,6 +108,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         data_dict = data_dict or check_dataset(data)  # check if None
     train_path, val_path = data_dict['train'], data_dict['val']
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
+    nt = int(data_dict['nt']) # number of timesteps
     names = ['item'] if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     assert len(names) == nc, f'{len(names)} names found for nc={nc} dataset in {data}'  # check
     is_coco = isinstance(val_path, str) and val_path.endswith('coco/val2017.txt')  # COCO dataset
@@ -113,18 +116,21 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # Model
     check_suffix(weights, '.pt')  # check weights
     pretrained = weights.endswith('.pt')
+
+    _m = VideoModel if nt > 1 else Model
+    
     if pretrained:
         with torch_distributed_zero_first(LOCAL_RANK):
             weights = attempt_download(weights)  # download if not found locally
         ckpt = torch.load(weights, map_location='cpu')  # load checkpoint to CPU to avoid CUDA memory leak
-        model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+        model = _m(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
         exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
         csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
         csd = intersect_dicts(csd, model.state_dict(), exclude=exclude)  # intersect
         model.load_state_dict(csd, strict=False)  # load
         LOGGER.info(f'Transferred {len(csd)}/{len(model.state_dict())} items from {weights}')  # report
     else:
-        model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
+        model = _m(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
     amp = check_amp(model)  # check AMP
 
     # Freeze
@@ -141,7 +147,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # Batch size
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
-        batch_size = check_train_batch_size(model, imgsz, amp)
+        batch_size = int(np.ceil(check_train_batch_size(model, imgsz, amp) / nt))
         loggers.on_params_update({"batch_size": batch_size})
 
     # Optimizer
@@ -219,20 +225,22 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # Trainloader
     train_loader, dataset = create_dataloader(train_path,
-                                              imgsz,
-                                              batch_size // WORLD_SIZE,
-                                              gs,
-                                              single_cls,
-                                              hyp=hyp,
-                                              augment=True,
-                                              cache=None if opt.cache == 'val' else opt.cache,
-                                              rect=opt.rect,
-                                              rank=LOCAL_RANK,
-                                              workers=workers,
-                                              image_weights=opt.image_weights,
-                                              quad=opt.quad,
-                                              prefix=colorstr('train: '),
-                                              shuffle=True)
+                                                imgsz,
+                                                batch_size // WORLD_SIZE,
+                                                gs,
+                                                nt,
+                                                opt.seq_batch,
+                                                single_cls,
+                                                hyp=hyp,
+                                                augment=True,
+                                                cache=None if opt.cache == 'val' else opt.cache,
+                                                rect=opt.rect,
+                                                rank=LOCAL_RANK,
+                                                workers=workers,
+                                                image_weights=opt.image_weights,
+                                                quad=opt.quad,
+                                                prefix=colorstr('train: '),
+                                                shuffle=True)
     mlc = int(np.concatenate(dataset.labels, 0)[:, 0].max())  # max label class
 
     nb = len(train_loader)  # number of batches
@@ -240,17 +248,19 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # Process 0
     if RANK in {-1, 0}:
         val_loader = create_dataloader(val_path,
-                                       imgsz,
-                                       batch_size // WORLD_SIZE * 2,
-                                       gs,
-                                       single_cls,
-                                       hyp=hyp,
-                                       cache=None if noval else opt.cache,
-                                       rect=True,
-                                       rank=-1,
-                                       workers=workers * 2,
-                                       pad=0, # This was 0.5, but caused things to break
-                                       prefix=colorstr('val: '))[0]
+                                        imgsz,
+                                        batch_size // WORLD_SIZE * 2,
+                                        gs,
+                                        nt,
+                                        opt.seq_batch,
+                                        single_cls,
+                                        hyp=hyp,
+                                        cache=None if noval else opt.cache,
+                                        rect=True,
+                                        rank=-1,
+                                        workers=workers * 2,
+                                        pad=0, # This was 0.5, but caused things to break
+                                        prefix=colorstr('val: '))[0]
 
         if not resume:
             labels = np.concatenate(dataset.labels, 0)
@@ -281,6 +291,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     hyp['obj'] *= (imgsz / 640) ** 2 * 3 / nl  # scale to image size and layers
     hyp['label_smoothing'] = opt.label_smoothing
     model.nc = nc  # attach number of classes to model
+    model.nt = nt
     model.hyp = hyp  # attach hyperparameters to model
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device) * nc  # attach class weights
     model.names = names
@@ -379,7 +390,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = f'{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G'  # (GB)
                 pbar.set_description(('%10s' * 2 + '%10.4g' * 5) %
-                                     (f'{epoch}/{epochs - 1}', mem, *mloss[0:3], targets.shape[0], imgs.shape[-1]))
+                                     (f'{epoch}/{epochs - 1}', mem, *mloss[:3], targets.shape[0], imgs.shape[-1]))
                 callbacks.run('on_train_batch_end', ni, model, imgs, targets, paths, plots)
                 if callbacks.stop_training:
                     return
@@ -525,6 +536,9 @@ def parse_opt(known=False):
     # Added arguments
     parser.add_argument('--noanchors', action='store_true', help='If you\'re using an end-to-end model with no anchors, use this flag')
 
+    #Video-specific arguments
+    parser.add_argument('--seq-batch', action='store_true', help='Each batch is sequential wrt. the previous epoch')
+
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
@@ -663,15 +677,6 @@ def main(opt, callbacks=Callbacks()):
         LOGGER.info(f'Hyperparameter evolution finished {opt.evolve} generations\n'
                     f"Results saved to {colorstr('bold', save_dir)}\n"
                     f'Usage example: $ python train.py --hyp {evolve_yaml}')
-
-
-def run(**kwargs):
-    # Usage: import train; train.run(data='coco128.yaml', imgsz=320, weights='yolov5m.pt')
-    opt = parse_opt(True)
-    for k, v in kwargs.items():
-        setattr(opt, k, v)
-    main(opt)
-    return opt
 
 
 if __name__ == "__main__":
