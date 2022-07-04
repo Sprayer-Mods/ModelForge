@@ -1,0 +1,14 @@
+# Sprayer Mods - GPL-3.0 license
+
+path: "datasets/cotton"
+train: "cotton_train.txt"
+val: "cotton_valid.txt"
+# test: ""
+
+nc: 3
+nt: 1 # number of timesteps
+names: ["crop", "weed", "weed cluster"]
+
+
+# download: |
+# Script to download here

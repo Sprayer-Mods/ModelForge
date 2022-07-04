@@ -1,6 +1,6 @@
-## Contributing to YOLOv5 🚀
+## Contributing to ModelForge
 
-We love your input! We want to make contributing to YOLOv5 as easy and transparent as possible, whether it's:
+We love your input! We want to make contributing to ModelForge as easy and transparent as possible, whether it's:
 
 - Reporting a bug
 - Discussing the current state of the code
@@ -8,7 +8,7 @@ We love your input! We want to make contributing to YOLOv5 as easy and transpare
 - Proposing a new feature
 - Becoming a maintainer
 
-YOLOv5 works so well due to our combined community effort, and for every small improvement you contribute you will be
+ModelForge works so well due to our combined community effort, and for every small improvement you contribute you will be
 helping push the frontiers of what's possible in AI 😃!
 
 ## Submitting a Pull Request (PR) 🛠️
@@ -51,7 +51,7 @@ To allow your work to be integrated as seamlessly as possible, we advise you to:
   of your local branch:
 
 ```bash
-git remote add upstream https://github.com/ultralytics/yolov5.git
+git remote add upstream https://github.com/Sprayer-Mods/ModelForge
 git fetch upstream
 # git checkout feature  # <--- replace 'feature' with local branch name
 git merge upstream/master
@@ -64,7 +64,7 @@ git push -u origin -f
 
 ## Submitting a Bug Report 🐛
 
-If you spot a problem with YOLOv5 please submit a Bug Report!
+If you spot a problem with ModelForge please submit a Bug Report!
 
 For us to start investigating a possible problem we need to be able to reproduce it ourselves first. We've created a few
 short guidelines below to help users provide what we need in order to get started.
@@ -78,17 +78,17 @@ the problem should be:
 - ✅ **Complete** – Provide **all** parts someone else needs to reproduce your problem in the question itself
 - ✅ **Reproducible** – Test the code you're about to provide to make sure it reproduces the problem
 
-In addition to the above requirements, for [Ultralytics](https://ultralytics.com/) to provide assistance your code
+In addition to the above requirements, for [Sprayer Mods](https://sprayermods.com/) to provide assistance your code
 should be:
 
 - ✅ **Current** – Verify that your code is up-to-date with current
-  GitHub [master](https://github.com/ultralytics/yolov5/tree/master), and if necessary `git pull` or `git clone` a new
+  GitHub [master](https://github.com/Sprayer-Mods/ModelForge/tree/master), and if necessary `git pull` or `git clone` a new
   copy to ensure your problem has not already been resolved by previous commits.
 - ✅ **Unmodified** – Your problem must be reproducible without any modifications to the codebase in this
-  repository. [Ultralytics](https://ultralytics.com/) does not provide support for custom code ⚠️.
+  repository. [Sprayer Mods](https://sprayermods.com/) does not provide support for custom code ⚠️.
 
 If you believe your problem meets all of the above criteria, please close this issue and raise a new one using the 🐛
-**Bug Report** [template](https://github.com/ultralytics/yolov5/issues/new/choose) and providing
+**Bug Report** [template](https://github.com/Sprayer-Mods/ModelForge/issues/new/choose) and providing
 a [minimum reproducible example](https://stackoverflow.com/help/minimal-reproducible-example) to help us better
 understand and diagnose your problem.
 
