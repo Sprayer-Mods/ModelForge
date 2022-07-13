@@ -248,7 +248,7 @@ def export_blob(file, prefix=colorstr('blob:')):
         # for yolov5s
         optimizer_params = [
             "--data_type=FP16",
-            "--input_shape=[1,3,640,640]",
+            "--input_shape=[1,3,512,512]",
             "--scale=255", # Scaling to [0,1]
             # f"--output_dir={f.parent}",
             "--output=output1_yolov5,output2_yolov5,output3_yolov5",
