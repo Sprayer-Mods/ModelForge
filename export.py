@@ -194,7 +194,7 @@ def export_openvino(model, file, half, prefix=colorstr('OpenVINO:')):
         LOGGER.info(f'\n{prefix} export failure: {e}')
 
 
-def export_blob(file, prefix=colorstr('blob:')):
+def export_blob(file, im, prefix=colorstr('blob:')):
 
     try:
         LOGGER.info(f"{prefix} starting blob export...")
@@ -245,10 +245,14 @@ def export_blob(file, prefix=colorstr('blob:')):
         LOGGER.info(f'{prefix} ONNX pruned successfully')
         LOGGER.info(f'{prefix} Converting from ONNX to blob')
 
+        shp = list(im.shape)
+
+        LOGGER.info(f'{prefix} Using input shape {shp}')
+
         # for yolov5s
         optimizer_params = [
             "--data_type=FP16",
-            "--input_shape=[1,3,640,640]",
+            f"--input_shape=[1,3,{shp[2]},{shp[3]}",
             "--scale=255", # Scaling to [0,1]
             # f"--output_dir={f.parent}",
             "--output=output1_yolov5,output2_yolov5,output3_yolov5",
@@ -606,7 +610,7 @@ def run(
         f[3] = export_openvino(model, file, True)
     if blob: # MYRIAD-X blob
         f[2] = export_onnx(model, im, file, 13, False, False, True)
-        f[4] = export_blob(file)
+        f[4] = export_blob(file, im)
     if coreml:
         _, f[5] = export_coreml(model, im, file, int8, half)
 
