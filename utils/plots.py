@@ -353,6 +353,7 @@ def plot_labels(labels, names=(), save_dir=Path('')):
     plt.close()
 
     # matplotlib labels
+    # Slightly different here
     matplotlib.use('svg')  # faster
     ax = plt.subplots(2, 2, figsize=(8, 8), tight_layout=True)[1].ravel()
     y = ax[0].hist(c, bins=np.linspace(0, nc, nc + 1) - 0.5, rwidth=0.8)

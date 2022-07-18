@@ -22,42 +22,53 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
+# from threading import Thread #added
 
 import numpy as np
-import torch
+import torch #from yolo5 only
 import torch.distributed as dist
 import torch.nn as nn
+import torch.nn.functional as F #added
+from torch.optim import SGD, Adam, AdamW, lr_scheduler # just imports opimizers rather than optim
+import torch.utils.data #added
 import yaml
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.optim import SGD, Adam, AdamW, lr_scheduler
+from torch.utils.tensorboard import SummaryWriter #added
 from tqdm import tqdm
 
+# From yolo5
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-import val  # for end-of-epoch mAP
+import val  # for end-of-epoch mAP #called test in yolo7
 from models.experimental import attempt_load
 from models.video import VideoModel
 from models.yolo import Model
 from utils.autoanchor import check_anchors
-from utils.autobatch import check_train_batch_size
-from utils.callbacks import Callbacks
 from utils.dataloaders import create_dataloader
+from utils.autobatch import check_train_batch_size #yolo5
+from utils.callbacks import Callbacks
 from utils.downloads import attempt_download
+# when it imports LOGGER, the name is forced as yolov5. Maybe should adjust so that is defined here?
 from utils.general import (LOGGER, check_amp, check_dataset, check_file, check_git_status, check_img_size,
                            check_requirements, check_suffix, check_version, check_yaml, colorstr, get_latest_run,
                            increment_path, init_seeds, intersect_dicts, labels_to_class_weights,
                            labels_to_image_weights, methods, one_cycle, print_args, print_mutation, strip_optimizer)
-from utils.loggers import Loggers
-from utils.loggers.wandb.wandb_utils import check_wandb_resume
-from utils.loss import ComputeLoss, ComputeYOLOXLoss
-from utils.metrics import fitness
-from utils.plots import plot_evolve, plot_labels
-from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
+                           # Leaving out set_logging - not entirely sure why it is needed.
+                           # Plus it is different between the versions
 
+from utils.loggers import Loggers #yolo5
+from utils.loggers.wandb.wandb_utils import check_wandb_resume
+# from utils.loss import ComputeLoss, ComputeYOLOXLoss
+from utils.loss import ComputeLoss, ComputeYOLOXLoss, ComputeLossOTA, ComputeLoss7 # need to add ComputeLossOTA to utils.loss
+from utils.metrics import fitness
+from utils.plots import plot_evolve, plot_labels #, plot_images, plot_rests
+# Very slight differences between (plot_evolve, plot_evolution), (plot_labels, plot_labels)
+# the others are also similar, but dont seem to be used here...
+from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first, is_parallel
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
@@ -73,6 +84,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     w = save_dir / 'weights'  # weights dir
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
     last, best = w / 'last.pt', w / 'best.pt'
+    #results_file = save_dir / 'results.txt' #Not sure what for
 
     # Hyperparameters
     if isinstance(hyp, str):
@@ -131,7 +143,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         LOGGER.info(f'Transferred {len(csd)}/{len(model.state_dict())} items from {weights}')  # report
     else:
         model = _m(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
-    amp = check_amp(model)  # check AMP
+    amp = check_amp(model)  # check AMP #yolo5
 
     # Freeze
     freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
@@ -144,6 +156,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # Image size
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
+    # imgsz, imgsz_test = [check_img_size(x, gs) for x in opt.img_size]  # verify imgsz are gs-multiples
+    # yolo5 uses same val/test image sizes. yolo7 could have different it seems
 
     # Batch size
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
@@ -165,16 +179,79 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             g[1].append(v.weight)
         elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):  # weight (with decay)
             g[0].append(v.weight)
+        #added from yolo7
+        if hasattr(v, 'im'):
+            if hasattr(v.im, 'implicit'):           
+                g[1].append(v.im.implicit)
+            else:
+                for iv in v.im:
+                    g[1].append(iv.implicit)
+        if hasattr(v, 'imc'):
+            if hasattr(v.imc, 'implicit'):           
+                g[1].append(v.imc.implicit)
+            else:
+                for iv in v.imc:
+                    g[1].append(iv.implicit)
+        if hasattr(v, 'imb'):
+            if hasattr(v.imb, 'implicit'):           
+                g[1].append(v.imb.implicit)
+            else:
+                for iv in v.imb:
+                    g[1].append(iv.implicit)
+        if hasattr(v, 'imo'):
+            if hasattr(v.imo, 'implicit'):           
+                g[1].append(v.imo.implicit)
+            else:
+                for iv in v.imo:
+                    g[1].append(iv.implicit)
+        if hasattr(v, 'ia'):
+            if hasattr(v.ia, 'implicit'):           
+                g[1].append(v.ia.implicit)
+            else:
+                for iv in v.ia:
+                    g[1].append(iv.implicit)
+        if hasattr(v, 'attn'):
+            if hasattr(v.attn, 'logit_scale'):   
+                g[1].append(v.attn.logit_scale)
+            if hasattr(v.attn, 'q_bias'):   
+                g[1].append(v.attn.q_bias)
+            if hasattr(v.attn, 'v_bias'):  
+                g[1].append(v.attn.v_bias)
+            if hasattr(v.attn, 'relative_position_bias_table'):  
+                g[1].append(v.attn.relative_position_bias_table)
+        if hasattr(v, 'rbr_dense'):
+            if hasattr(v.rbr_dense, 'weight_rbr_origin'):  
+                g[1].append(v.rbr_dense.weight_rbr_origin)
+            if hasattr(v.rbr_dense, 'weight_rbr_avg_conv'): 
+                g[1].append(v.rbr_dense.weight_rbr_avg_conv)
+            if hasattr(v.rbr_dense, 'weight_rbr_pfir_conv'):  
+                g[1].append(v.rbr_dense.weight_rbr_pfir_conv)
+            if hasattr(v.rbr_dense, 'weight_rbr_1x1_kxk_idconv1'): 
+                g[1].append(v.rbr_dense.weight_rbr_1x1_kxk_idconv1)
+            if hasattr(v.rbr_dense, 'weight_rbr_1x1_kxk_conv2'):   
+                g[1].append(v.rbr_dense.weight_rbr_1x1_kxk_conv2)
+            if hasattr(v.rbr_dense, 'weight_rbr_gconv_dw'):   
+                g[1].append(v.rbr_dense.weight_rbr_gconv_dw)
+            if hasattr(v.rbr_dense, 'weight_rbr_gconv_pw'):   
+                g[1].append(v.rbr_dense.weight_rbr_gconv_pw)
+            if hasattr(v.rbr_dense, 'vector'):   
+                g[1].append(v.rbr_dense.vector)
 
+    # In yolo7 these take g[1] not g[2]...
+    first_var = 2
+    second_var = 1  
+    if model.yolo7:
+        first_var = 1
+        second_var = 2
     if opt.optimizer == 'Adam':
-        optimizer = Adam(g[2], lr=hyp['lr0'], betas=(hyp['momentum'], 0.999))  # adjust beta1 to momentum
+        optimizer = Adam(g[first_var], lr=hyp['lr0'], betas=(hyp['momentum'], 0.999))  # adjust beta1 to momentum
     elif opt.optimizer == 'AdamW':
-        optimizer = AdamW(g[2], lr=hyp['lr0'], betas=(hyp['momentum'], 0.999))  # adjust beta1 to momentum
+        optimizer = AdamW(g[first_var], lr=hyp['lr0'], betas=(hyp['momentum'], 0.999))  # adjust beta1 to momentum
     else:
-        optimizer = SGD(g[2], lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
+        optimizer = SGD(g[first_var], lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
 
     optimizer.add_param_group({'params': g[0], 'weight_decay': hyp['weight_decay']})  # add g0 with weight_decay
-    optimizer.add_param_group({'params': g[1]})  # add g1 (BatchNorm2d weights)
+    optimizer.add_param_group({'params': g[second_var]})  # add g1 (BatchNorm2d weights)
     LOGGER.info(f"{colorstr('optimizer:')} {type(optimizer).__name__} with parameter groups "
                 f"{len(g[1])} weight (no decay), {len(g[0])} weight, {len(g[2])} bias")
     del g
@@ -242,7 +319,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                 prefix=colorstr('train: '),
                                                 shuffle=True)
     mlc = int(np.concatenate(dataset.labels, 0)[:, 0].max())  # max label class
-
     nb = len(train_loader)  # number of batches
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
     # Process 0
@@ -284,20 +360,22 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         else:
             model = DDP(model, device_ids=[LOCAL_RANK], output_device=LOCAL_RANK)
 
-    # Model attributes
+    # Model attributes # adde decimals after some constants ot make floats
     nl = de_parallel(model).model[-1].nl  # number of detection layers (to scale hyps)
-    hyp['box'] *= 3 / nl  # scale to layers
-    hyp['cls'] *= nc / 80 * 3 / nl  # scale to classes and layers
-    hyp['obj'] *= (imgsz / 640) ** 2 * 3 / nl  # scale to image size and layers
+    hyp['box'] *= 3. / nl  # scale to layers
+    hyp['cls'] *= nc / 80. * 3 / nl  # scale to classes and layers
+    hyp['obj'] *= (imgsz / 640) ** 2 * 3. / nl  # scale to image size and layers
     hyp['label_smoothing'] = opt.label_smoothing
     model.nc = nc  # attach number of classes to model
     model.nt = nt
     model.hyp = hyp  # attach hyperparameters to model
+    model.gr = 1.0  # iou loss ratio (obj_loss = 1.0 or iou) # yolo7
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device) * nc  # attach class weights
     model.names = names
 
     # Start training
     t0 = time.time()
+    #yolo7 uses 1000...
     nw = max(round(hyp['warmup_epochs'] * nb), 100)  # number of warmup iterations, max(3 epochs, 100 iterations)
     # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
     last_opt_step = -1
@@ -307,7 +385,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
     stopper = EarlyStopping(patience=opt.patience)
 
-    compute_loss = ComputeYOLOXLoss(model) if model.yolox else ComputeLoss(model)# init loss class
+
+    # compute_loss_ota = ComputeLossOTA(model) # init loss class
+    # Might need to make a computeLoss7 here because it is formatted slightly differently
+    # Also make a function that gets called to do this better. These are getting messy
+    compute_loss = ComputeYOLOXLoss(model) if model.yolox else (ComputeLoss7(model) if model.yolo7 else ComputeLoss(model)) # init loss class
+    compute_loss_ota = ComputeLossOTA(model) if model.yolo7 else compute_loss # init loss class
+
     callbacks.run('on_train_start')
     LOGGER.info(f'Image sizes {imgsz} train, {imgsz} val\n'
                 f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'
@@ -328,7 +412,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
         # dataset.mosaic_border = [b - imgsz, -b]  # height, width borders
         # mloss = torch.zeros(3, device=device)
-        mloss = torch.zeros(4, device=device) if model.yolox else torch.zeros(3, device=device)
+        mloss = torch.zeros(4, device=device) if (model.yolox or model.yolo7) else torch.zeros(3, device=device)
         # mean losses
         # Could be reduced to one thing with 3 values.
         # I included the l1 loss in the yolox because it was there
@@ -343,7 +427,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
             callbacks.run('on_train_batch_start')
             ni = i + nb * epoch  # number integrated batches (since train start)
-            imgs = imgs.to(device, non_blocking=True).float() / 255  # uint8 to float32, 0-255 to 0.0-1.0
+            imgs = imgs.to(device, non_blocking=True).float() / 255.0  # uint8 to float32, 0-255 to 0.0-1.0
 
             # Warmup
             if ni <= nw:
@@ -362,12 +446,15 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 sf = sz / max(imgs.shape[2:])  # scale factor
                 if sf != 1:
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to gs-multiple)
-                    imgs = nn.functional.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
+                    imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
+                    # imgs = nn.functional.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
             # Forward
             with torch.cuda.amp.autocast(amp):
                 pred = model(imgs)  # forward
-                loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
+                #computes OTAloss here
+                # loss, loss_items = compute_loss_ota(pred, targets.to(device), imgs)
+                loss, loss_items = compute_loss_ota(pred, targets.to(device), imgs)  # loss scaled by batch_size
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode
                 if opt.quad:
