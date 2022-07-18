@@ -1,0 +1,14 @@
+# Sprayer Mods - GPL-3.0 license
+
+path: "datasets/fallow"
+train: "fallow_train.txt"
+val: "fallow_valid.txt"
+# test: ""
+
+nc: 2
+nt: 1 # number of timesteps
+names: ["weed", "weed cluster"]
+
+
+# download: |
+# Script to download here
