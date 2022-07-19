@@ -127,6 +127,29 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 |:-:|:-:|
 |Automatically track and visualize all your YOLOv5 training runs in the cloud with [Weights & Biases](https://wandb.ai/site?utm_campaign=repo_yolo_readme)|Label and export your custom datasets directly to YOLOv5 for training with [Roboflow](https://roboflow.com/?ref=ultralytics) |
 
+## <div align="center">YOLOv7</div>
+   <p> New SOTA in Object Detection! </p>
+<p align="center">
+   <img width="800" src="https://user-images.githubusercontent.com/46688118/179826545-ee31b4ec-5daa-4be3-a787-c74f3f966d5b.png">
+   </p>
+<details align="left">
+   <p>
+      <a href="https://github.com/WongKinYiu/yolov7">YOLOv7 Repo</a>
+      <br>
+      <a href="https://arxiv.org/abs/2207.02696">YOLOv7 Arxiv report</a>
+</details>
+   
+## <div align="center">YOLOX</div>
+   <p> Anchorless object detection! </p>
+<p align="center">
+   <img width="800" src="https://user-images.githubusercontent.com/46688118/174135974-41f00231-1f60-4151-b649-18ed9c532613.png">
+   </p>
+<details align="left">
+   <p>
+      <a href="https://github.com/Megvii-BaseDetection/YOLOX">YOLOX Repo</a>
+      <br>
+      <a href="https://arxiv.org/abs/2107.08430">YOLOX Arxiv report</a>
+</details>
 
 ## <div align="center">YOLOv5</div>
 
@@ -144,18 +167,6 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 - **EfficientDet** data from [google/automl](https://github.com/google/automl) at batch size 8.
 - **Reproduce** by `python val.py --task study --data coco.yaml --iou 0.7 --weights yolov5n6.pt yolov5s6.pt yolov5m6.pt yolov5l6.pt yolov5x6.pt`
 
-</details>
-   
-## <div align="center">YOLOX</div>
-   <p> Anchorless object detection! </p>
-<p align="center">
-   <img width="800" src="https://user-images.githubusercontent.com/46688118/174135974-41f00231-1f60-4151-b649-18ed9c532613.png">
-   </p>
-<details align="left">
-   <p>
-      <a href="https://github.com/Megvii-BaseDetection/YOLOX">YOLOX Repo</a>
-      <br>
-      <a href="https://arxiv.org/abs/2107.08430">YOLOX Arxiv report</a>
 </details>
 
 ### Pretrained Checkpoints
@@ -180,6 +191,7 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 |---                    |---  |---    |---    |---    |---    |---    |---    |---
 |YOLOv7 tiny            |640                    |38.7                     |56.7               |---                          |**3.4**                        |---                            |6.2                | 13.8
 |YOLOv7                 |640                    |**51.2**                 |**69.7**           |---                          |6.2                            |---                            |36.9               |104.7
+|                       |     |       |       |       |       |       |       |
 |YOLOX-S                |640                    |39.6                     |---                |---                          |9.8                            |---                            |9.0                |26.8
 |YOLOX-M                |640                    |46.4                     |65.4               |---                          |12.3                           |---                            |25.3               |73.8
 |YOLOX-L                |640                    |50.0                     |68.5               |---                          |14.5                           |---                            |54.2               |155.6
