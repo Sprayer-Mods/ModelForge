@@ -146,7 +146,7 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 
 </details>
    
-## <div align="center">Coming Soon: YOLOX</div>
+## <div align="center">YOLOX</div>
    <p> Anchorless object detection! </p>
 <p align="center">
    <img width="800" src="https://user-images.githubusercontent.com/46688118/174135974-41f00231-1f60-4151-b649-18ed9c532613.png">
@@ -180,7 +180,10 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 |---                    |---  |---    |---    |---    |---    |---    |---    |---
 |YOLOv7 tiny            |640                    |38.7                     |56.7               |---                          |**3.4**                        |---                            |6.2                | 13.8
 |YOLOv7                 |640                    |**51.2**                 |**69.7**           |---                          |6.2                            |---                            |36.9               |104.7
-|Coming Soon...         |                       |                         |                   |                             |                               |                               |                   |
+|YOLOX-S                |640                    |39.6                     |---                |---                          |9.8                            |---                            |9.0                |26.8
+|YOLOX-M                |640                    |46.4                     |65.4               |---                          |12.3                           |---                            |25.3               |73.8
+|YOLOX-L                |640                    |50.0                     |68.5               |---                          |14.5                           |---                            |54.2               |155.6
+|YOLOX-X                |640                    |51.2                     |69.6               |---                          |17.3                           |---                            |99.6               |281.4
   
 *See CITATIONS. Implemented from one of the included repositories/papers listed.
 

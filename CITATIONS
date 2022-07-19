@@ -17,3 +17,21 @@
   booktitle={Proceedings of the IEEE International Conference on Computer Vision},
   year={2019}
 } 
+@article{yolox2021,
+title={YOLOX: Exceeding YOLO Series in 2021},
+author={Ge, Zheng and Liu, Songtao and Wang, Feng and Li, Zeming and Sun, Jian},
+journal={arXiv preprint arXiv:2107.08430},
+year={2021}
+}
+@article{wang2022yolov7,
+  title={{YOLOv7}: Trainable bag-of-freebies sets new state-of-the-art for real-time object detectors},
+  author={Wang, Chien-Yao and Bochkovskiy, Alexey and Liao, Hong-Yuan Mark},
+  journal={arXiv preprint arXiv:2207.02696},
+  year={2022}
+}
+@article{wang2021you,
+  title={You Only Learn One Representation: Unified Network for Multiple Tasks},
+  author={Wang, Chien-Yao and Yeh, I-Hau and Liao, Hong-Yuan Mark},
+  journal={arXiv preprint arXiv:2105.04206},
+  year={2021}
+}
