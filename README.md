@@ -2,8 +2,7 @@
    <h1>Model Forge</h1>
 <br>
 <p>
-ModelForge, a derivative of Ultralytics' YOLOv5, is a family of object detection architectures and models pretrained on the COCO dataset. It represents a joint <a href="https://ultralytics.com">Ultralytics</a>
-  and <a href="https://sprayermods.com">Sprayer Mods</a> open-source research into future vision AI methods, incorporating lessons learned and best practices evolved over thousands of hours of research and development. Sprayer Mods is appending new features and model types to an already amazing repository and model structure. Along with this we are implementing several AWS features [SageMaker, S3, EC2].
+ModelForge, a derivative of Ultralytics' YOLOv5, is a family of object detection architectures and models pretrained on the COCO dataset. It represents a conglomeration of efforts by <a href="https://sprayermods.com">Sprayer Mods</a> <a href="https://github.com/Sprayer-Mods/ModelForge/blob/master/CITATIONS">et. al.</a> into the state of the art computer vision methods, incorporating lessons learned and best practices evolved over thousands of hours of research and development. Sprayer Mods is appending new features and model types to an already amazing repository and model structure. Along with this we are implementing several AWS features [SageMaker, S3, EC2].
 </p>
 
 ## <div align="center">Documentation</div>
