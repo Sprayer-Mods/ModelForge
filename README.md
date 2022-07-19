@@ -130,7 +130,7 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 ## <div align="center">YOLOv7</div>
    <p> New SOTA in Object Detection! </p>
 <p align="center">
-   <img width="800" src="https://user-images.githubusercontent.com/46688118/179826545-ee31b4ec-5daa-4be3-a787-c74f3f966d5b.png">
+   <img width="800" src="https://user-images.githubusercontent.com/46688118/179826914-a3446e61-4e93-4169-b45c-d30d0acd3cd7.png">
    </p>
 <details align="left">
    <p>
