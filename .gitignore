@@ -258,3 +258,6 @@ fabric.properties
 
 # Sprayer Mods Changes--------------------------------------------------------------------------------------------------
 datasets/*
+data/sm/*
+best_weights/*
+*.blob
