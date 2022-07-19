@@ -174,12 +174,12 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 |[YOLOv5l6][assets]     |1280 |53.7   |71.3   |1784   |15.8   |10.5   |76.8   |111.4
 |[YOLOv5x6][assets]<br>+ [TTA][TTA]|1280<br>1536 |55.0<br>**55.8** |72.7<br>**72.7** |3136<br>- |26.2<br>- |19.4<br>- |140.7<br>- |209.8<br>-
   
-### Added by Sprayer Mods*
+### Added by Sprayer Mods\*
 
-|Model |size<br><sup>(pixels) |mAP<sup>val<br>0.5:0.95 |mAP<sup>val<br>0.5 |Speed<br><sup>CPU b1<br>(ms) |Speed<br><sup>V100 b1<br>(ms) |Speed<br><sup>V100 b32<br>(ms) |params<br><sup>(M) |FLOPs<br><sup>@640 (B)
-|YOLOv7 tiny            |640  |38.7    |56.7    |---    |**3.4**|---    |6.2    |13.8
-|YOLOv7                 |640  |**51.2**|**69.7**|---    |6.2    |---    |36.9   |104.7
-|Coming Soon...         |     |        |        |       |       |       |       |
+|Model                  |size<br><sup>(pixels)  |mAP<sup>val<br>0.5:0.95  |mAP<sup>val<br>0.5 |Speed<br><sup>CPU b1<br>(ms) |Speed<br><sup>V100 b1<br>(ms)  |Speed<br><sup>V100 b32<br>(ms) |params<br><sup>(M) |FLOPs<br><sup>@640 (B)
+|YOLOv7 tiny            |640                    |38.7                     |56.7               |---                          |**3.4**                        |---                            |6.2                | 13.8
+|YOLOv7                 |640                    |**51.2**                 |**69.7**           |---                          |6.2                            |---                            |36.9               |104.7
+|Coming Soon...         |                       |                         |                   |                             |                               |                               |                   |
   
 *See CITATIONS. Implemented from one of the included repositories/papers listed.
 
