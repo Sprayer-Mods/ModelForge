@@ -127,6 +127,29 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 |:-:|:-:|
 |Automatically track and visualize all your YOLOv5 training runs in the cloud with [Weights & Biases](https://wandb.ai/site?utm_campaign=repo_yolo_readme)|Label and export your custom datasets directly to YOLOv5 for training with [Roboflow](https://roboflow.com/?ref=ultralytics) |
 
+## <div align="center">YOLOv7</div>
+   <p> New SOTA in Object Detection! </p>
+<p align="center">
+   <img width="800" src="https://user-images.githubusercontent.com/46688118/179826914-a3446e61-4e93-4169-b45c-d30d0acd3cd7.png">
+   </p>
+<details align="left">
+   <p>
+      <a href="https://github.com/WongKinYiu/yolov7">YOLOv7 Repo</a>
+      <br>
+      <a href="https://arxiv.org/abs/2207.02696">YOLOv7 Arxiv report</a>
+</details>
+   
+## <div align="center">YOLOX</div>
+   <p> Anchorless object detection! </p>
+<p align="center">
+   <img width="800" src="https://user-images.githubusercontent.com/46688118/174135974-41f00231-1f60-4151-b649-18ed9c532613.png">
+   </p>
+<details align="left">
+   <p>
+      <a href="https://github.com/Megvii-BaseDetection/YOLOX">YOLOX Repo</a>
+      <br>
+      <a href="https://arxiv.org/abs/2107.08430">YOLOX Arxiv report</a>
+</details>
 
 ## <div align="center">YOLOv5</div>
 
@@ -145,24 +168,12 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 - **Reproduce** by `python val.py --task study --data coco.yaml --iou 0.7 --weights yolov5n6.pt yolov5s6.pt yolov5m6.pt yolov5l6.pt yolov5x6.pt`
 
 </details>
-   
-## <div align="center">Coming Soon: YOLOX</div>
-   <p> Anchorless object detection! </p>
-<p align="center">
-   <img width="800" src="https://user-images.githubusercontent.com/46688118/174135974-41f00231-1f60-4151-b649-18ed9c532613.png">
-   </p>
-<details align="left">
-   <p>
-      <a href="https://github.com/Megvii-BaseDetection/YOLOX">YOLOX Repo</a>
-      <br>
-      <a href="https://arxiv.org/abs/2107.08430">YOLOX Arxiv report</a>
-</details>
 
 ### Pretrained Checkpoints
 
 |Model |size<br><sup>(pixels) |mAP<sup>val<br>0.5:0.95 |mAP<sup>val<br>0.5 |Speed<br><sup>CPU b1<br>(ms) |Speed<br><sup>V100 b1<br>(ms) |Speed<br><sup>V100 b32<br>(ms) |params<br><sup>(M) |FLOPs<br><sup>@640 (B)
 |---                    |---  |---    |---    |---    |---    |---    |---    |---
-|[YOLOv5n][assets]      |640  |28.0   |45.7   |**45** |**6.3**|**0.6**|**1.9**|**4.5**
+|[YOLOv5n][assets]      |640  |28.0   |45.7   |**45** |6.3    |**0.6**|**1.9**|**4.5**
 |[YOLOv5s][assets]      |640  |37.4   |56.8   |98     |6.4    |0.9    |7.2    |16.5
 |[YOLOv5m][assets]      |640  |45.4   |64.1   |224    |8.2    |1.7    |21.2   |49.0
 |[YOLOv5l][assets]      |640  |49.0   |67.3   |430    |10.1   |2.7    |46.5   |109.1
@@ -173,7 +184,20 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 |[YOLOv5m6][assets]     |1280 |51.3   |69.3   |887    |11.1   |6.8    |35.7   |50.0
 |[YOLOv5l6][assets]     |1280 |53.7   |71.3   |1784   |15.8   |10.5   |76.8   |111.4
 |[YOLOv5x6][assets]<br>+ [TTA][TTA]|1280<br>1536 |55.0<br>**55.8** |72.7<br>**72.7** |3136<br>- |26.2<br>- |19.4<br>- |140.7<br>- |209.8<br>-
-|More to come...|       |     |       |       |       |       |       |       |
+  
+### Added by Sprayer Mods\*
+
+|Model                  |size<br><sup>(pixels)  |mAP<sup>val<br>0.5:0.95  |mAP<sup>val<br>0.5 |Speed<br><sup>CPU b1<br>(ms) |Speed<br><sup>V100 b1<br>(ms)  |Speed<br><sup>V100 b32<br>(ms) |params<br><sup>(M) |FLOPs<br><sup>@640 (B)
+|---                    |---  |---    |---    |---    |---    |---    |---    |---
+|YOLOv7 tiny            |640                    |38.7                     |56.7               |---                          |**3.4**                        |---                            |6.2                | 13.8
+|YOLOv7                 |640                    |**51.2**                 |**69.7**           |---                          |6.2                            |---                            |36.9               |104.7
+|                       |     |       |       |       |       |       |       |
+|YOLOX-S                |640                    |39.6                     |---                |---                          |9.8                            |---                            |9.0                |26.8
+|YOLOX-M                |640                    |46.4                     |65.4               |---                          |12.3                           |---                            |25.3               |73.8
+|YOLOX-L                |640                    |50.0                     |68.5               |---                          |14.5                           |---                            |54.2               |155.6
+|YOLOX-X                |640                    |51.2                     |69.6               |---                          |17.3                           |---                            |99.6               |281.4
+  
+*See CITATIONS. Implemented from one of the included repositories/papers listed.
 
 <details align="left">
   <summary>Table Notes (click to expand)</summary>
