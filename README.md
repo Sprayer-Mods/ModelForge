@@ -1,5 +1,7 @@
 <div align="center">
-   <h1>Model Forge</h1>
+
+# ModelForge :hammer_and_pick:
+
 <br>
 <p>
 ModelForge, a derivative of Ultralytics' YOLOv5, is a family of object detection architectures and models pretrained on the COCO dataset. It represents a conglomeration of efforts by <a href="https://sprayermods.com">Sprayer Mods</a> <a href="https://github.com/Sprayer-Mods/ModelForge/blob/master/CITATIONS">et. al.</a> into the state of the art computer vision methods, incorporating lessons learned and best practices evolved over thousands of hours of research and development. Sprayer Mods is appending new features and model types to an already amazing repository and model structure. Along with this we are implementing several AWS features [SageMaker, S3, EC2].
@@ -188,10 +190,10 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 
 |Model                  |size<br><sup>(pixels)  |mAP<sup>val<br>0.5:0.95  |mAP<sup>val<br>0.5 |Speed<br><sup>CPU b1<br>(ms) |Speed<br><sup>V100 b1<br>(ms)  |Speed<br><sup>V100 b32<br>(ms) |params<br><sup>(M) |FLOPs<br><sup>@640 (B)
 |---                    |---  |---    |---    |---    |---    |---    |---    |---
-|YOLOv7 tiny            |640                    |38.7                     |56.7               |---                          |**3.4**                        |---                            |6.2                | 13.8
+|YOLOv7 tiny            |640                    |38.7                     |56.7               |---                          |**3.4**                        |---                            |**6.2**                | **13.8**
 |YOLOv7                 |640                    |**51.2**                 |**69.7**           |---                          |6.2                            |---                            |36.9               |104.7
 |                       |     |       |       |       |       |       |       |
-|YOLOX-S                |640                    |39.6                     |---                |---                          |9.8                            |---                            |9.0                |26.8
+|YOLOX-S                |640                    |39.6                     |---                |---                          |9.8                          |---                            |9.0                |26.8
 |YOLOX-M                |640                    |46.4                     |65.4               |---                          |12.3                           |---                            |25.3               |73.8
 |YOLOX-L                |640                    |50.0                     |68.5               |---                          |14.5                           |---                            |54.2               |155.6
 |YOLOX-X                |640                    |51.2                     |69.6               |---                          |17.3                           |---                            |99.6               |281.4
@@ -210,14 +212,14 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 
 ## <div align="center">Contribute</div>
 
-We love your input! We want to make contributing to ModelForge as easy and transparent as possible. Please see the YOLOv5 [Contributing Guide](CONTRIBUTING.md) to get started. Thank you to all of the YOLOv5 contributors!
+We love your input! We want to make contributing to ModelForge as easy and transparent as possible. Please see the [Contributing Guide](CONTRIBUTING.md) to get started. Thank you to all of the YOLOv5 contributors and deep learning researchers!
 
 <a href="https://github.com/ultralytics/yolov5/graphs/contributors"><img src="https://opencollective.com/ultralytics/contributors.svg?width=990" /></a>
 
 ## <div align="center">Contact</div>
 
 For ModelForge bugs and feature requests please visit [GitHub Issues](https://github.com/Sprayer-Mods/ModelForge/issues). For business inquiries or
-professional support requests please visit [https://sprayermods.com/contact](https://sprayermosd.com/contact).
+professional support requests please visit [https://sprayermods.com/contact](https://sprayermods.com/contact).
 
 <br>
 
