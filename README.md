@@ -190,8 +190,8 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 
 |Model                  |size<br><sup>(pixels)  |mAP<sup>val<br>0.5:0.95  |mAP<sup>val<br>0.5 |Speed<br><sup>CPU b1<br>(ms) |Speed<br><sup>V100 b1<br>(ms)  |Speed<br><sup>V100 b32<br>(ms) |params<br><sup>(M) |FLOPs<br><sup>@640 (B)
 |---                    |---  |---    |---    |---    |---    |---    |---    |---
-|YOLOv7 tiny            |640                    |38.7                     |56.7               |---                          |**3.4**                        |---                            |**6.2**                | **13.8**
-|YOLOv7                 |640                    |**51.2**                 |**69.7**           |---                          |6.2                            |---                            |36.9               |104.7
+|[YOLOv7 tiny][yolov7-tiny]|640                    |38.7                     |56.7               |---                          |**3.4**                        |---                            |**6.2**                | **13.8**
+|[YOLOv7][yolov7]       |640                    |**51.2**                 |**69.7**           |---                          |6.2                            |---                            |36.9               |104.7
 |                       |     |       |       |       |       |       |       |
 |YOLOX-S                |640                    |39.6                     |---                |---                          |9.8                          |---                            |9.0                |26.8
 |YOLOX-M                |640                    |46.4                     |65.4               |---                          |12.3                           |---                            |25.3               |73.8
@@ -234,5 +234,7 @@ professional support requests please visit [https://sprayermods.com/contact](htt
     <img width="3%" />
 </div>
 
+[yolov7]: https://drive.google.com/file/d/1e6F2Kin1gJ0zae20MXgPPZR7Ir_g2RqX/view?usp=sharing
+[yolov7-tiny]: https://drive.google.com/file/d/18adK2cmn_UcMgjy3Rz81-wz2TS2bxobt/view?usp=sharing
 [assets]: https://github.com/ultralytics/yolov5/releases
 [tta]: https://github.com/ultralytics/yolov5/issues/303
