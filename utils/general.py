@@ -298,7 +298,7 @@ def git_describe(path=ROOT):  # path must be a directory
 @WorkingDirectory(ROOT)
 def check_git_status():
     # Recommend 'git pull' if code is out of date
-    msg = ', for updates see https://github.com/ultralytics/yolov5'
+    msg = ', for updates see https://github.com/Sprayer-Mods/ModelForge'
     s = colorstr('github: ')  # string
     assert Path('.git').exists(), s + 'skipping check (not a git repository)' + msg
     assert not is_docker(), s + 'skipping check (Docker image)' + msg
@@ -309,7 +309,7 @@ def check_git_status():
     branch = check_output('git rev-parse --abbrev-ref HEAD', shell=True).decode().strip()  # checked out
     n = int(check_output(f'git rev-list {branch}..origin/master --count', shell=True))  # commits behind
     if n > 0:
-        s += f"⚠️ YOLOv5 is out of date by {n} commit{'s' * (n > 1)}. Use `git pull` or `git clone {url}` to update."
+        s += f"⚠️ ModelForge is out of date by {n} commit{'s' * (n > 1)}. Use `git pull` or `git clone {url}` to update."
     else:
         s += f'up to date with {url} ✅'
     LOGGER.info(emojis(s))  # emoji-safe

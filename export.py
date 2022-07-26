@@ -252,9 +252,8 @@ def export_blob(file, im, prefix=colorstr('blob:')):
         # for yolov5s
         optimizer_params = [
             "--data_type=FP16",
-            f"--input_shape=[1,3,{shp[2]},{shp[3]}",
+            f"--input_shape=[1,3,{shp[2]},{shp[3]}]",
             "--scale=255", # Scaling to [0,1]
-            # f"--output_dir={f.parent}",
             "--output=output1_yolov5,output2_yolov5,output3_yolov5",
             "--reverse_input_channel"
         ]
