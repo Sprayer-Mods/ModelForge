@@ -321,6 +321,10 @@ class DetectMultiBackend(nn.Module):
         from models.experimental import attempt_download, attempt_load  # scoped to avoid circular import
 
         super().__init__()
+
+        self.yolox = False
+        self.yolov7 = False
+
         w = str(weights[0] if isinstance(weights, list) else weights)
         pt, jit, onnx, xml, blob, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs = self.model_type(w)  # get backend
         w = attempt_download(w)  # download if not local
@@ -738,7 +742,7 @@ class Classify(nn.Module):
         return self.flat(self.conv(z))  # flatten to x(b,c2)
 
 
-# added for yolo7 from yolor
+# added for yolov7 from yolor
 class ImplicitA(nn.Module):
     def __init__(self, channel, mean=0., std=.02):
         super(ImplicitA, self).__init__()
@@ -764,7 +768,7 @@ class ImplicitM(nn.Module):
     def forward(self, x):
         return self.implicit * x
 
-# Added from yolo7
+# Added from yolov7
 class MP(nn.Module):
     def __init__(self, k=2):
         super(MP, self).__init__()

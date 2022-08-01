@@ -165,7 +165,7 @@ class Model(nn.Module):
         self.inplace = self.yaml.get('inplace', True)
 
         self.yolox = False
-        self.yolo7 = False
+        self.yolov7 = False
         # Build strides, anchors
         m = self.model[-1]  # Detect() or YoloXHead()
         if isinstance(m, Detect):
@@ -184,7 +184,7 @@ class Model(nn.Module):
             m.initialize_biases()
             # self._initialize_biases()
         if isinstance(m, IDetect):
-            self.yolo7 = True
+            self.yolov7 = True
             s = 256  # 2x min stride
             m.stride = torch.tensor([s / x.shape[-2] for x in self.forward(torch.zeros(1, ch, s, s))])  # forward
             m.anchors /= m.stride.view(-1, 1, 1)

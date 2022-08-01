@@ -43,7 +43,7 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-import val  # for end-of-epoch mAP #called test in yolo7
+import val  # for end-of-epoch mAP #called test in yolov7
 from models.experimental import attempt_load
 from models.video import VideoModel
 from models.yolo import Model
@@ -157,7 +157,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
     # imgsz, imgsz_test = [check_img_size(x, gs) for x in opt.img_size]  # verify imgsz are gs-multiples
-    # yolo5 uses same val/test image sizes. yolo7 could have different it seems
+    # yolo5 uses same val/test image sizes. yolov7 could have different it seems
 
     # Batch size
     if RANK == -1 and batch_size == -1:  # single-GPU only, estimate best batch size
@@ -179,7 +179,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             g[1].append(v.weight)
         elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):  # weight (with decay)
             g[0].append(v.weight)
-        #added from yolo7
+        #added from yolov7
         if hasattr(v, 'im'):
             if hasattr(v.im, 'implicit'):           
                 g[1].append(v.im.implicit)
@@ -237,10 +237,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if hasattr(v.rbr_dense, 'vector'):   
                 g[1].append(v.rbr_dense.vector)
 
-    # In yolo7 these take g[1] not g[2]...
+    # In yolov7 these take g[1] not g[2]...
     first_var = 2
     second_var = 1  
-    if model.yolo7:
+    if model.yolov7:
         first_var = 1
         second_var = 2
     if opt.optimizer == 'Adam':
@@ -369,13 +369,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     model.nc = nc  # attach number of classes to model
     model.nt = nt
     model.hyp = hyp  # attach hyperparameters to model
-    model.gr = 1.0  # iou loss ratio (obj_loss = 1.0 or iou) # yolo7
+    model.gr = 1.0  # iou loss ratio (obj_loss = 1.0 or iou) # yolov7
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device) * nc  # attach class weights
     model.names = names
 
     # Start training
     t0 = time.time()
-    #yolo7 uses 1000...
+    #yolov7 uses 1000...
     nw = max(round(hyp['warmup_epochs'] * nb), 100)  # number of warmup iterations, max(3 epochs, 100 iterations)
     # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
     last_opt_step = -1
@@ -389,8 +389,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # compute_loss_ota = ComputeLossOTA(model) # init loss class
     # Might need to make a computeLoss7 here because it is formatted slightly differently
     # Also make a function that gets called to do this better. These are getting messy
-    compute_loss = ComputeYOLOXLoss(model) if model.yolox else (ComputeLoss7(model) if model.yolo7 else ComputeLoss(model)) # init loss class
-    compute_loss_ota = ComputeLossOTA(model) if model.yolo7 else compute_loss # init loss class
+    compute_loss = ComputeYOLOXLoss(model) if model.yolox else (ComputeLoss7(model) if model.yolov7 else ComputeLoss(model)) # init loss class
+    compute_loss_ota = ComputeLossOTA(model) if model.yolov7 else compute_loss # init loss class
 
     callbacks.run('on_train_start')
     LOGGER.info(f'Image sizes {imgsz} train, {imgsz} val\n'
@@ -412,7 +412,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
         # dataset.mosaic_border = [b - imgsz, -b]  # height, width borders
         # mloss = torch.zeros(3, device=device)
-        mloss = torch.zeros(4, device=device) if (model.yolox or model.yolo7) else torch.zeros(3, device=device)
+        mloss = torch.zeros(4, device=device) if (model.yolox or model.yolov7) else torch.zeros(3, device=device)
         # mean losses
         # Could be reduced to one thing with 3 values.
         # I included the l1 loss in the yolox because it was there
