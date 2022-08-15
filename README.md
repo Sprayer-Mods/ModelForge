@@ -63,7 +63,7 @@ python detect.py --source 0  # webcam
                           img.jpg  # image
                           vid.mp4  # video
                           path/  # directory
-                          path/*.jpg  # glob
+                          'path/*.jpg'  # glob
                           'https://youtu.be/Zgi9g1ksQHc'  # YouTube
                           'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
 ```
@@ -99,29 +99,36 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 - [Train Custom Data](https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data)  🚀 RECOMMENDED
 - [Tips for Best Training Results](https://github.com/ultralytics/yolov5/wiki/Tips-for-Best-Training-Results)  ☘️
   RECOMMENDED
-- [Weights & Biases Logging](https://github.com/ultralytics/yolov5/issues/1289)  🌟 NEW
-- [Roboflow for Datasets, Labeling, and Active Learning](https://github.com/ultralytics/yolov5/issues/4975)  🌟 NEW
 - [Multi-GPU Training](https://github.com/ultralytics/yolov5/issues/475)
-- [PyTorch Hub](https://github.com/ultralytics/yolov5/issues/36)  ⭐ NEW
+- [PyTorch Hub](https://github.com/ultralytics/yolov5/issues/36) 🌟 NEW
 - [TFLite, ONNX, CoreML, TensorRT Export](https://github.com/ultralytics/yolov5/issues/251) 🚀
 - [Test-Time Augmentation (TTA)](https://github.com/ultralytics/yolov5/issues/303)
 - [Model Ensembling](https://github.com/ultralytics/yolov5/issues/318)
 - [Model Pruning/Sparsity](https://github.com/ultralytics/yolov5/issues/304)
 - [Hyperparameter Evolution](https://github.com/ultralytics/yolov5/issues/607)
-- [Transfer Learning with Frozen Layers](https://github.com/ultralytics/yolov5/issues/1314)  ⭐ NEW
-- [Architecture Summary](https://github.com/ultralytics/yolov5/issues/6998)  ⭐ NEW
+- [Transfer Learning with Frozen Layers](https://github.com/ultralytics/yolov5/issues/1314)
+- [Architecture Summary](https://github.com/ultralytics/yolov5/issues/6998) 🌟 NEW
+- [Weights & Biases Logging](https://github.com/ultralytics/yolov5/issues/1289)
+- [Roboflow for Datasets, Labeling, and Active Learning](https://github.com/ultralytics/yolov5/issues/4975)  🌟 NEW
+- [ClearML Logging](https://github.com/ultralytics/yolov5/tree/master/utils/loggers/clearml) 🌟 NEW
+- [Deci Platform](https://github.com/ultralytics/yolov5/wiki/Deci-Platform) 🌟 NEW
 
 </details>
 
 ## <div align="center">Integrations</div>
 
 <div align="center">
-    <a href="https://wandb.ai/site?utm_campaign=repo_yolo_readme">
-        <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-wb-long.png" width="49%"/>
-    </a>
-    <a href="https://roboflow.com/?ref=ultralytics">
-        <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-roboflow-long.png" width="49%"/>
-    </a>
+  <a href="https://bit.ly/yolov5-deci-platform">
+    <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-deci.png" width="10%" /></a>
+  <img src="https://github.com/ultralytics/assets/raw/master/social/logo-transparent.png" width="14%" height="0" alt="" />
+  <a href="https://cutt.ly/yolov5-readme-clearml">
+    <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-clearml.png" width="10%" /></a>
+  <img src="https://github.com/ultralytics/assets/raw/master/social/logo-transparent.png" width="14%" height="0" alt="" />
+  <a href="https://roboflow.com/?ref=ultralytics">
+    <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-roboflow.png" width="10%" /></a>
+  <img src="https://github.com/ultralytics/assets/raw/master/social/logo-transparent.png" width="14%" height="0" alt="" />
+  <a href="https://wandb.ai/site?utm_campaign=repo_yolo_readme">
+    <img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/logo-wb.png" width="10%" /></a>
 </div>
 
 |Weights and Biases|Roboflow ⭐ NEW|
@@ -214,7 +221,8 @@ python train.py --data coco.yaml --cfg yolov5n.yaml --weights '' --batch-size 12
 
 We love your input! We want to make contributing to ModelForge as easy and transparent as possible. Please see the [Contributing Guide](CONTRIBUTING.md) to get started. Thank you to all of the YOLOv5 contributors and deep learning researchers!
 
-<a href="https://github.com/ultralytics/yolov5/graphs/contributors"><img src="https://opencollective.com/ultralytics/contributors.svg?width=990" /></a>
+<!-- SVG image from https://opencollective.com/ultralytics/contributors.svg?width=990 -->
+<a href="https://github.com/ultralytics/yolov5/graphs/contributors"><img src="https://github.com/ultralytics/yolov5/releases/download/v1.0/image-contributors-1280.png" /></a>
 
 ## <div align="center">Contact</div>
 

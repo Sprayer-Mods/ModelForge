@@ -14,6 +14,7 @@ import random
 import re
 import shutil
 import signal
+import sys
 import threading
 import time
 import urllib
@@ -52,7 +53,7 @@ np.set_printoptions(linewidth=320, formatter={'float_kind': '{:11.5g}'.format}) 
 pd.options.display.max_columns = 10
 cv2.setNumThreads(0)  # prevent OpenCV from multithreading (incompatible with PyTorch DataLoader)
 os.environ['NUMEXPR_MAX_THREADS'] = str(NUM_THREADS)  # NumExpr max threads
-os.environ['OMP_NUM_THREADS'] = str(NUM_THREADS)  # OpenMP max threads (PyTorch and SciPy)
+os.environ['OMP_NUM_THREADS'] = '1' if platform.system() == 'darwin' else str(NUM_THREADS)  # OpenMP (PyTorch and SciPy)
 
 
 def is_kaggle():
@@ -68,7 +69,7 @@ def is_kaggle():
 def is_writeable(dir, test=False):
     # Return True if directory has write permissions, test opening a file with write permissions if test=True
     if not test:
-        return os.access(dir, os.R_OK)  # possible issues on Windows
+        return os.access(dir, os.W_OK)  # possible issues on Windows
     file = Path(dir) / 'tmp.txt'
     try:
         with open(file, 'w'):  # open file with write permissions
@@ -85,7 +86,7 @@ def set_logging(name=None, verbose=VERBOSE):
         for h in logging.root.handlers:
             logging.root.removeHandler(h)  # remove all handlers associated with the root logger object
     rank = int(os.getenv('RANK', -1))  # rank in world for Multi-GPU trainings
-    level = logging.INFO if verbose and rank in {-1, 0} else logging.WARNING
+    level = logging.INFO if verbose and rank in {-1, 0} else logging.ERROR
     log = logging.getLogger(name)
     log.setLevel(level)
     handler = logging.StreamHandler()
@@ -96,6 +97,8 @@ def set_logging(name=None, verbose=VERBOSE):
 
 set_logging()  # run before defining LOGGER
 LOGGER = logging.getLogger("yolov5")  # define globally (used in train.py, val.py, detect.py, etc.)
+for fn in LOGGER.info, LOGGER.warning:
+    _fn, fn = fn, lambda x: _fn(emojis(x))  # emoji safe logging
 
 
 def user_config_dir(dir='Ultralytics', env_var='YOLOV5_CONFIG_DIR'):
@@ -195,14 +198,22 @@ def print_args(args: Optional[dict] = None, show_file=True, show_fcn=False):
     LOGGER.info(colorstr(s) + ', '.join(f'{k}={v}' for k, v in args.items()))
 
 
-def init_seeds(seed=0):
+def init_seeds(seed=0, deterministic=False):
     # Initialize random number generator (RNG) seeds https://pytorch.org/docs/stable/notes/randomness.html
     # cudnn seed 0 settings are slower and more reproducible, else faster and less reproducible
     import torch.backends.cudnn as cudnn
+
+    if deterministic and check_version(torch.__version__, '1.12.0'):  # https://github.com/ultralytics/yolov5/pull/8213
+        torch.use_deterministic_algorithms(True)
+        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+        os.environ['PYTHONHASHSEED'] = str(seed)
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     cudnn.benchmark, cudnn.deterministic = (False, True) if seed == 0 else (True, False)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # for Multi-GPU, exception safe
 
 
 def intersect_dicts(da, db, exclude=()):
@@ -216,9 +227,15 @@ def get_latest_run(search_dir='.'):
     return max(last_list, key=os.path.getctime) if last_list else ''
 
 
-def is_docker():
-    # Is environment a Docker container?
-    return Path('/workspace').exists()  # or Path('/.dockerenv').exists()
+def is_docker() -> bool:
+    """Check if the process runs inside a docker container."""
+    if Path("/.dockerenv").exists():
+        return True
+    try:  # check if docker is in control groups
+        with open("/proc/self/cgroup") as file:
+            return any("docker" in line for line in file)
+    except OSError:
+        return False
 
 
 def is_colab():
@@ -296,23 +313,30 @@ def git_describe(path=ROOT):  # path must be a directory
 
 @try_except
 @WorkingDirectory(ROOT)
-def check_git_status():
-    # Recommend 'git pull' if code is out of date
-    msg = ', for updates see https://github.com/Sprayer-Mods/ModelForge'
+def check_git_status(repo='ultralytics/yolov5'):
+    # YOLOv5 status check, recommend 'git pull' if code is out of date
+    url = f'https://github.com/{repo}'
+    msg = f', for updates see {url}'
     s = colorstr('github: ')  # string
     assert Path('.git').exists(), s + 'skipping check (not a git repository)' + msg
-    assert not is_docker(), s + 'skipping check (Docker image)' + msg
     assert check_online(), s + 'skipping check (offline)' + msg
 
-    cmd = 'git fetch && git config --get remote.origin.url'
-    url = check_output(cmd, shell=True, timeout=5).decode().strip().rstrip('.git')  # git fetch
+    splits = re.split(pattern=r'\s', string=check_output('git remote -v', shell=True).decode())
+    matches = [repo in s for s in splits]
+    if any(matches):
+        remote = splits[matches.index(True) - 1]
+    else:
+        remote = 'ultralytics'
+        check_output(f'git remote add {remote} {url}', shell=True)
+    check_output(f'git fetch {remote}', shell=True, timeout=5)  # git fetch
     branch = check_output('git rev-parse --abbrev-ref HEAD', shell=True).decode().strip()  # checked out
-    n = int(check_output(f'git rev-list {branch}..origin/master --count', shell=True))  # commits behind
+    n = int(check_output(f'git rev-list {branch}..{remote}/master --count', shell=True))  # commits behind
     if n > 0:
-        s += f"⚠️ ModelForge is out of date by {n} commit{'s' * (n > 1)}. Use `git pull` or `git clone {url}` to update."
+        pull = 'git pull' if remote == 'origin' else f'git pull {remote} master'
+        s += f"⚠️ YOLOv5 is out of date by {n} commit{'s' * (n > 1)}. Use `{pull}` or `git clone {url}` to update."
     else:
         s += f'up to date with {url} ✅'
-    LOGGER.info(emojis(s))  # emoji-safe
+    LOGGER.info(s)
 
 
 def check_python(minimum='3.7.0'):
@@ -366,7 +390,7 @@ def check_requirements(requirements=ROOT / 'requirements.txt', exclude=(), insta
         source = file.resolve() if 'file' in locals() else requirements
         s = f"{prefix} {n} package{'s' * (n > 1)} updated per {source}\n" \
             f"{prefix} ⚠️ {colorstr('bold', 'Restart runtime or rerun command for updates to take effect')}\n"
-        LOGGER.info(emojis(s))
+        LOGGER.info(s)
 
 
 def check_img_size(imgsz, s=32, floor=0):
@@ -428,6 +452,9 @@ def check_file(file, suffix=''):
             torch.hub.download_url_to_file(url, file)
             assert Path(file).exists() and Path(file).stat().st_size > 0, f'File download failed: {url}'  # check
         return file
+    elif file.startswith('clearml://'):  # ClearML Dataset ID
+        assert 'clearml' in sys.modules, "ClearML is not installed, so cannot use ClearML dataset. Try running 'pip install clearml'."
+        return file
     else:  # search
         files = []
         for d in 'data', 'models', 'utils':  # search directories
@@ -464,9 +491,9 @@ def check_dataset(data, autodownload=True):
 
     # Checks
     for k in 'train', 'val', 'nc':
-        assert k in data, emojis(f"data.yaml '{k}:' field missing ❌")
+        assert k in data, f"data.yaml '{k}:' field missing ❌"
     if 'names' not in data:
-        LOGGER.warning(emojis("data.yaml 'names:' field missing ⚠, assigning default names 'class0', 'class1', etc."))
+        LOGGER.warning("data.yaml 'names:' field missing ⚠️, assigning default names 'class0', 'class1', etc.")
         data['names'] = [f'class{i}' for i in range(data['nc'])]  # default names
 
     # Resolve paths
@@ -482,9 +509,9 @@ def check_dataset(data, autodownload=True):
     if val:
         val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
         if not all(x.exists() for x in val):
-            LOGGER.info(emojis('\nDataset not found ⚠, missing paths %s' % [str(x) for x in val if not x.exists()]))
+            LOGGER.info('\nDataset not found ⚠️, missing paths %s' % [str(x) for x in val if not x.exists()])
             if not s or not autodownload:
-                raise Exception(emojis('Dataset not found ❌'))
+                raise Exception('Dataset not found ❌')
             t = time.time()
             root = path.parent if 'path' in data else '..'  # unzip directory i.e. '../'
             if s.startswith('http') and s.endswith('.zip'):  # URL
@@ -502,7 +529,7 @@ def check_dataset(data, autodownload=True):
                 r = exec(s, {'yaml': data})  # return None
             dt = f'({round(time.time() - t, 1)}s)'
             s = f"success ✅ {dt}, saved to {colorstr('bold', root)}" if r in (0, None) else f"failure {dt} ❌"
-            LOGGER.info(emojis(f"Dataset download {s}"))
+            LOGGER.info(f"Dataset download {s}")
     check_font('Arial.ttf' if is_ascii(data['names']) else 'Arial.Unicode.ttf', progress=True)  # download fonts
     return data  # dictionary
 
@@ -527,11 +554,11 @@ def check_amp(model):
     im = f if f.exists() else 'https://ultralytics.com/images/bus.jpg' if check_online() else np.ones((640, 640, 3))
     try:
         assert amp_allclose(model, im) or amp_allclose(DetectMultiBackend('yolov5n.pt', device), im)
-        LOGGER.info(emojis(f'{prefix}checks passed ✅'))
+        LOGGER.info(f'{prefix}checks passed ✅')
         return True
     except Exception:
         help_url = 'https://github.com/ultralytics/yolov5/issues/7908'
-        LOGGER.warning(emojis(f'{prefix}checks failed ❌, disabling Automatic Mixed Precision. See {help_url}'))
+        LOGGER.warning(f'{prefix}checks failed ❌, disabling Automatic Mixed Precision. See {help_url}')
         return False
 
 
@@ -636,7 +663,7 @@ def labels_to_class_weights(labels, nc=80):
         return torch.Tensor()
 
     labels = np.concatenate(labels, 0)  # labels.shape = (866643, 5) for COCO
-    classes = labels[:, 0].astype(np.int)  # labels = [class xywh]
+    classes = labels[:, 0].astype(int)  # labels = [class xywh]
     weights = np.bincount(classes, minlength=nc)  # occurrences per class
 
     # Prepend gridpoint count (for uCE training)
@@ -646,13 +673,13 @@ def labels_to_class_weights(labels, nc=80):
     weights[weights == 0] = 1  # replace empty bins with 1
     weights = 1 / weights  # number of targets per class
     weights /= weights.sum()  # normalize
-    return torch.from_numpy(weights)
+    return torch.from_numpy(weights).float()
 
 
 def labels_to_image_weights(labels, nc=80, class_weights=np.ones(80)):
     # Produces image weights based on class_weights and image contents
     # Usage: index = random.choices(range(n), weights=image_weights, k=1)  # weighted image sample
-    class_counts = np.array([np.bincount(x[:, 0].astype(np.int), minlength=nc) for x in labels])
+    class_counts = np.array([np.bincount(x[:, 0].astype(int), minlength=nc) for x in labels])
     return (class_weights.reshape(1, nc) * class_counts).sum(1)
 
 

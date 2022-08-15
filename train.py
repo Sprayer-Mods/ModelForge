@@ -68,7 +68,8 @@ from utils.metrics import fitness
 from utils.plots import plot_evolve, plot_labels #, plot_images, plot_rests
 # Very slight differences between (plot_evolve, plot_evolution), (plot_labels, plot_labels)
 # the others are also similar, but dont seem to be used here...
-from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first, is_parallel
+from utils.torch_utils import (EarlyStopping, ModelEMA, de_parallel, select_device, smart_DDP, smart_optimizer,
+                               smart_resume, torch_distributed_zero_first), is_parallel
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
 WORLD_SIZE = int(os.getenv('WORLD_SIZE', 1))
@@ -91,6 +92,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         with open(hyp, errors='ignore') as f:
             hyp = yaml.safe_load(f)  # load hyps dict
     LOGGER.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
+    opt.hyp = hyp.copy()  # for saving hyps to checkpoints
 
     # Save run settings
     if not evolve:
@@ -103,6 +105,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     data_dict = None
     if RANK in {-1, 0}:
         loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
+        if loggers.clearml:
+            data_dict = loggers.clearml.data_dict  # None if no ClearML dataset or filled in by ClearML
         if loggers.wandb:
             data_dict = loggers.wandb.data_dict
             if resume:
@@ -115,7 +119,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # Config
     plots = not evolve and not opt.noplots  # create plots
     cuda = device.type != 'cpu'
-    init_seeds(1 + RANK)
+    init_seeds(opt.seed + 1 + RANK, deterministic=True)
     with torch_distributed_zero_first(LOCAL_RANK):
         data_dict = data_dict or check_dataset(data)  # check if None
     train_path, val_path = data_dict['train'], data_dict['val']
@@ -149,6 +153,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
     for k, v in model.named_parameters():
         v.requires_grad = True  # train all layers
+        # v.register_hook(lambda x: torch.nan_to_num(x))  # NaN to 0 (commented for erratic training results)
         if any(x in k for x in freeze):
             LOGGER.info(f'freezing {k}')
             v.requires_grad = False
@@ -168,93 +173,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     nbs = 64  # nominal batch size
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
     hyp['weight_decay'] *= batch_size * accumulate / nbs  # scale weight_decay
-    LOGGER.info(f"Scaled weight_decay = {hyp['weight_decay']}")
-
-    g = [], [], []  # optimizer parameter groups
-    bn = tuple(v for k, v in nn.__dict__.items() if 'Norm' in k)  # normalization layers, i.e. BatchNorm2d()
-    for v in model.modules():
-        if hasattr(v, 'bias') and isinstance(v.bias, nn.Parameter):  # bias
-            g[2].append(v.bias)
-        if isinstance(v, bn):  # weight (no decay)
-            g[1].append(v.weight)
-        elif hasattr(v, 'weight') and isinstance(v.weight, nn.Parameter):  # weight (with decay)
-            g[0].append(v.weight)
-        #added from yolov7
-        if hasattr(v, 'im'):
-            if hasattr(v.im, 'implicit'):           
-                g[1].append(v.im.implicit)
-            else:
-                for iv in v.im:
-                    g[1].append(iv.implicit)
-        if hasattr(v, 'imc'):
-            if hasattr(v.imc, 'implicit'):           
-                g[1].append(v.imc.implicit)
-            else:
-                for iv in v.imc:
-                    g[1].append(iv.implicit)
-        if hasattr(v, 'imb'):
-            if hasattr(v.imb, 'implicit'):           
-                g[1].append(v.imb.implicit)
-            else:
-                for iv in v.imb:
-                    g[1].append(iv.implicit)
-        if hasattr(v, 'imo'):
-            if hasattr(v.imo, 'implicit'):           
-                g[1].append(v.imo.implicit)
-            else:
-                for iv in v.imo:
-                    g[1].append(iv.implicit)
-        if hasattr(v, 'ia'):
-            if hasattr(v.ia, 'implicit'):           
-                g[1].append(v.ia.implicit)
-            else:
-                for iv in v.ia:
-                    g[1].append(iv.implicit)
-        if hasattr(v, 'attn'):
-            if hasattr(v.attn, 'logit_scale'):   
-                g[1].append(v.attn.logit_scale)
-            if hasattr(v.attn, 'q_bias'):   
-                g[1].append(v.attn.q_bias)
-            if hasattr(v.attn, 'v_bias'):  
-                g[1].append(v.attn.v_bias)
-            if hasattr(v.attn, 'relative_position_bias_table'):  
-                g[1].append(v.attn.relative_position_bias_table)
-        if hasattr(v, 'rbr_dense'):
-            if hasattr(v.rbr_dense, 'weight_rbr_origin'):  
-                g[1].append(v.rbr_dense.weight_rbr_origin)
-            if hasattr(v.rbr_dense, 'weight_rbr_avg_conv'): 
-                g[1].append(v.rbr_dense.weight_rbr_avg_conv)
-            if hasattr(v.rbr_dense, 'weight_rbr_pfir_conv'):  
-                g[1].append(v.rbr_dense.weight_rbr_pfir_conv)
-            if hasattr(v.rbr_dense, 'weight_rbr_1x1_kxk_idconv1'): 
-                g[1].append(v.rbr_dense.weight_rbr_1x1_kxk_idconv1)
-            if hasattr(v.rbr_dense, 'weight_rbr_1x1_kxk_conv2'):   
-                g[1].append(v.rbr_dense.weight_rbr_1x1_kxk_conv2)
-            if hasattr(v.rbr_dense, 'weight_rbr_gconv_dw'):   
-                g[1].append(v.rbr_dense.weight_rbr_gconv_dw)
-            if hasattr(v.rbr_dense, 'weight_rbr_gconv_pw'):   
-                g[1].append(v.rbr_dense.weight_rbr_gconv_pw)
-            if hasattr(v.rbr_dense, 'vector'):   
-                g[1].append(v.rbr_dense.vector)
-
-    # In yolov7 these take g[1] not g[2]...
-    first_var = 2
-    second_var = 1  
-    if model.yolov7:
-        first_var = 1
-        second_var = 2
-    if opt.optimizer == 'Adam':
-        optimizer = Adam(g[first_var], lr=hyp['lr0'], betas=(hyp['momentum'], 0.999))  # adjust beta1 to momentum
-    elif opt.optimizer == 'AdamW':
-        optimizer = AdamW(g[first_var], lr=hyp['lr0'], betas=(hyp['momentum'], 0.999))  # adjust beta1 to momentum
-    else:
-        optimizer = SGD(g[first_var], lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
-
-    optimizer.add_param_group({'params': g[0], 'weight_decay': hyp['weight_decay']})  # add g0 with weight_decay
-    optimizer.add_param_group({'params': g[second_var]})  # add g1 (BatchNorm2d weights)
-    LOGGER.info(f"{colorstr('optimizer:')} {type(optimizer).__name__} with parameter groups "
-                f"{len(g[1])} weight (no decay), {len(g[0])} weight, {len(g[2])} bias")
-    del g
+    optimizer = smart_optimizer(model, opt.optimizer, hyp['lr0'], hyp['momentum'], hyp['weight_decay'])
 
     # Scheduler
     if opt.cos_lr:
@@ -267,26 +186,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     ema = ModelEMA(model) if RANK in {-1, 0} else None
 
     # Resume
-    start_epoch, best_fitness = 0, 0.0
+    best_fitness, start_epoch = 0.0, 0
     if pretrained:
-        # Optimizer
-        if ckpt['optimizer'] is not None:
-            optimizer.load_state_dict(ckpt['optimizer'])
-            best_fitness = ckpt['best_fitness']
-
-        # EMA
-        if ema and ckpt.get('ema'):
-            ema.ema.load_state_dict(ckpt['ema'].float().state_dict())
-            ema.updates = ckpt['updates']
-
-        # Epochs
-        start_epoch = ckpt['epoch'] + 1
-        if resume:
-            assert start_epoch > 0, f'{weights} training to {epochs} epochs is finished, nothing to resume.'
-        if epochs < start_epoch:
-            LOGGER.info(f"{weights} has been trained for {ckpt['epoch']} epochs. Fine-tuning for {epochs} more epochs.")
-            epochs += ckpt['epoch']  # finetune additional epochs
-
+        best_fitness, start_epoch, epochs = smart_resume(ckpt, optimizer, ema, weights, epochs, resume)
         del ckpt, csd
 
     # DP mode
@@ -355,10 +257,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # DDP mode
     if cuda and RANK != -1:
-        if check_version(torch.__version__, '1.11.0'):
-            model = DDP(model, device_ids=[LOCAL_RANK], output_device=LOCAL_RANK, static_graph=True)
-        else:
-            model = DDP(model, device_ids=[LOCAL_RANK], output_device=LOCAL_RANK)
+        model = smart_DDP(model)
 
     # Model attributes # adde decimals after some constants ot make floats
     nl = de_parallel(model).model[-1].nl  # number of detection layers (to scale hyps)
@@ -375,7 +274,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # Start training
     t0 = time.time()
-    #yolov7 uses 1000...
+    nb = len(train_loader)  # number of batches
     nw = max(round(hyp['warmup_epochs'] * nb), 100)  # number of warmup iterations, max(3 epochs, 100 iterations)
     # nw = min(nw, (epochs - start_epoch) / 2 * nb)  # limit warmup to < 1/2 of training
     last_opt_step = -1
@@ -383,7 +282,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
-    stopper = EarlyStopping(patience=opt.patience)
+    stopper, stop = EarlyStopping(patience=opt.patience), False
 
 
     # compute_loss_ota = ComputeLossOTA(model) # init loss class
@@ -436,7 +335,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 accumulate = max(1, np.interp(ni, xi, [1, nbs / batch_size]).round())
                 for j, x in enumerate(optimizer.param_groups):
                     # bias lr falls from 0.1 to lr0, all other lrs rise from 0.0 to lr0
-                    x['lr'] = np.interp(ni, xi, [hyp['warmup_bias_lr'] if j == 2 else 0.0, x['initial_lr'] * lf(epoch)])
+                    x['lr'] = np.interp(ni, xi, [hyp['warmup_bias_lr'] if j == 0 else 0.0, x['initial_lr'] * lf(epoch)])
                     if 'momentum' in x:
                         x['momentum'] = np.interp(ni, xi, [hyp['warmup_momentum'], hyp['momentum']])
 
@@ -463,8 +362,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Backward
             scaler.scale(loss).backward()
 
-            # Optimize
+            # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
             if ni - last_opt_step >= accumulate:
+                scaler.unscale_(optimizer)  # unscale gradients
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10.0)  # clip gradients
                 scaler.step(optimizer)  # optimizer.step
                 scaler.update()
                 optimizer.zero_grad()
@@ -496,6 +397,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 results, maps, _ = val.run(data_dict,
                                            batch_size=batch_size // WORLD_SIZE * 2,
                                            imgsz=imgsz,
+                                           half=amp,
                                            model=ema.ema,
                                            single_cls=single_cls,
                                            dataloader=val_loader,
@@ -506,6 +408,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
             # Update best mAP
             fi = fitness(np.array(results).reshape(1, -1))  # weighted combination of [P, R, mAP@.5, mAP@.5-.95]
+            stop = stopper(epoch=epoch, fitness=fi)  # early stop check
             if fi > best_fitness:
                 best_fitness = fi
             log_vals = list(mloss.data[:3]) + list(results[:7]) + lr
@@ -521,6 +424,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     'updates': ema.updates,
                     'optimizer': optimizer.state_dict(),
                     'wandb_id': loggers.wandb.wandb_run.id if loggers.wandb else None,
+                    'opt': vars(opt),
                     'date': datetime.now().isoformat()}
 
                 # Save last, best and delete
@@ -532,19 +436,14 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 del ckpt
                 callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
 
-            # Stop Single-GPU
-            if RANK == -1 and stopper(epoch=epoch, fitness=fi):
-                break
-
-            # Stop DDP TODO: known issues shttps://github.com/ultralytics/yolov5/pull/4576
-            # stop = stopper(epoch=epoch, fitness=fi)
-            # if RANK == 0:
-            #    dist.broadcast_object_list([stop], 0)  # broadcast 'stop' to all ranks
-
-        # Stop DPP
-        # with torch_distributed_zero_first(RANK):
-        # if stop:
-        #    break  # must break all DDP ranks
+        # EarlyStopping
+        if RANK != -1:  # if DDP training
+            broadcast_list = [stop if RANK == 0 else None]
+            dist.broadcast_object_list(broadcast_list, 0)  # broadcast 'stop' to all ranks
+            if RANK != 0:
+                stop = broadcast_list[0]
+        if stop:
+            break  # must break all DDP ranks
 
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training -----------------------------------------------------------------------------------------------------
@@ -612,7 +511,8 @@ def parse_opt(known=False):
     parser.add_argument('--patience', type=int, default=100, help='EarlyStopping patience (epochs without improvement)')
     parser.add_argument('--freeze', nargs='+', type=int, default=[0], help='Freeze layers: backbone=10, first3=0 1 2')
     parser.add_argument('--save-period', type=int, default=-1, help='Save checkpoint every x epochs (disabled if < 1)')
-    parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
+    parser.add_argument('--seed', type=int, default=0, help='Global training seed')
+    parser.add_argument('--local_rank', type=int, default=-1, help='Automatic DDP Multi-GPU argument, do not modify')
 
     # Weights & Biases arguments
     parser.add_argument('--entity', default=None, help='W&B: Entity')
@@ -626,8 +526,7 @@ def parse_opt(known=False):
     #Video-specific arguments
     parser.add_argument('--seq-batch', action='store_true', help='Each batch is sequential wrt. the previous epoch')
 
-    opt = parser.parse_known_args()[0] if known else parser.parse_args()
-    return opt
+    return parser.parse_known_args()[0] if known else parser.parse_args()
 
 
 def main(opt, callbacks=Callbacks()):
@@ -638,13 +537,19 @@ def main(opt, callbacks=Callbacks()):
         check_requirements(exclude=['thop'])
 
     # Resume
-    if opt.resume and not check_wandb_resume(opt) and not opt.evolve:  # resume an interrupted run
-        ckpt = opt.resume if isinstance(opt.resume, str) else get_latest_run()  # specified or most recent path
-        assert os.path.isfile(ckpt), 'ERROR: --resume checkpoint does not exist'
-        with open(Path(ckpt).parent.parent / 'opt.yaml', errors='ignore') as f:
-            opt = argparse.Namespace(**yaml.safe_load(f))  # replace
-        opt.cfg, opt.weights, opt.resume = '', ckpt, True  # reinstate
-        LOGGER.info(f'Resuming training from {ckpt}')
+    if opt.resume and not (check_wandb_resume(opt) or opt.evolve):  # resume from specified or most recent last.pt
+        last = Path(check_file(opt.resume) if isinstance(opt.resume, str) else get_latest_run())
+        opt_yaml = last.parent.parent / 'opt.yaml'  # train options yaml
+        opt_data = opt.data  # original dataset
+        if opt_yaml.is_file():
+            with open(opt_yaml, errors='ignore') as f:
+                d = yaml.safe_load(f)
+        else:
+            d = torch.load(last, map_location='cpu')['opt']
+        opt = argparse.Namespace(**d)  # replace
+        opt.cfg, opt.weights, opt.resume = '', str(last), True  # reinstate
+        if is_url(opt_data):
+            opt.data = check_file(opt_data)  # avoid HUB resume auth timeout
     else:
         opt.data, opt.cfg, opt.hyp, opt.weights, opt.project = \
             check_file(opt.data), check_yaml(opt.cfg), check_yaml(opt.hyp), str(opt.weights), str(opt.project)  # checks
@@ -715,6 +620,8 @@ def main(opt, callbacks=Callbacks()):
             hyp = yaml.safe_load(f)  # load hyps dict
             if 'anchors' not in hyp and not opt.noanchors:  # anchors commented in hyp.yaml
                 hyp['anchors'] = 3
+        if opt.noautoanchor:
+            del hyp['anchors'], meta['anchors']
         opt.noval, opt.nosave, save_dir = True, True, Path(opt.save_dir)  # only val/save final epoch
         # ei = [isinstance(x, (int, float)) for x in hyp.values()]  # evolvable indices
         evolve_yaml, evolve_csv = save_dir / 'hyp_evolve.yaml', save_dir / 'evolve.csv'

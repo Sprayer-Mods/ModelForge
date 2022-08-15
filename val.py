@@ -38,7 +38,7 @@ from models.common import DetectMultiBackend
 from utils.callbacks import Callbacks
 from utils.dataloaders import create_dataloader
 from utils.general import (LOGGER, check_dataset, check_img_size, check_requirements, check_yaml,
-                           coco80_to_coco91_class, colorstr, emojis, increment_path, non_max_suppression, print_args,
+                           coco80_to_coco91_class, colorstr, increment_path, non_max_suppression, print_args,
                            scale_coords, xywh2xyxy, xyxy2xywh)
 from utils.metrics import ConfusionMatrix, ap_per_class, box_iou
 from utils.plots import output_to_target, plot_images, plot_val_study
@@ -77,7 +77,7 @@ def process_batch(detections, labels, iouv):
     Returns:
         correct (Array[N, 10]), for 10 IoU levels
     """
-    correct = torch.zeros(detections.shape[0], iouv.shape[0], dtype=torch.bool, device=iouv.device)
+    correct = np.zeros((detections.shape[0], iouv.shape[0])).astype(bool)
     iou = box_iou(labels[:, 1:], detections[:, :4])
     correct_class = labels[:, 0:1] == detections[:, 5]
     for i in range(len(iouv)):
@@ -90,7 +90,7 @@ def process_batch(detections, labels, iouv):
                 # matches = matches[matches[:, 2].argsort()[::-1]]
                 matches = matches[np.unique(matches[:, 0], return_index=True)[1]]
             correct[matches[:, 1].astype(int), i] = True
-    return correct
+    return torch.tensor(correct, dtype=torch.bool, device=iouv.device)
 
 
 @torch.no_grad()
@@ -164,7 +164,7 @@ def run(
     if not training:
         if pt and not single_cls:  # check --weights are trained on --data
             ncm = model.model.nc
-            assert ncm == nc, f'{weights[0]} ({ncm} classes) trained on different --data than what you passed ({nc} ' \
+            assert ncm == nc, f'{weights} ({ncm} classes) trained on different --data than what you passed ({nc} ' \
                               f'classes). Pass correct combination of --weights and --data that are trained together.'
         model.warmup(imgsz=(1 if pt else batch_size, 3, imgsz, imgsz))  # warmup
         pad = 0.0 if task in ('speed', 'benchmark') else 0.5
@@ -182,7 +182,7 @@ def run(
 
     seen = 0
     confusion_matrix = ConfusionMatrix(nc=nc)
-    names = {k: v for k, v in enumerate(model.names if hasattr(model, 'names') else model.module.names)}
+    names = dict(enumerate(model.names if hasattr(model, 'names') else model.module.names))
     class_map = coco80_to_coco91_class() if is_coco else list(range(1000))
     s = ('%20s' + '%11s' * 6) % ('Class', 'Images', 'Labels', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
     dt, p, r, f1, mp, mr, map50, map = [0.0, 0.0, 0.0], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
@@ -231,7 +231,9 @@ def run(
 
             if npr == 0:
                 if nl:
-                    stats.append((correct, *torch.zeros((3, 0), device=device)))
+                    stats.append((correct, *torch.zeros((2, 0), device=device), labels[:, 0]))
+                    if plots:
+                        confusion_matrix.process_batch(detections=None, labels=labels[:, 0])
                 continue
 
             # Predictions
@@ -252,7 +254,7 @@ def run(
 
             # Save/log
             if save_txt:
-                save_one_txt(predn, save_conf, shape, file=save_dir / 'labels' / (path.stem + '.txt'))
+                save_one_txt(predn, save_conf, shape, file=save_dir / 'labels' / f'{path.stem}.txt')
             if save_json:
                 save_one_json(predn, jdict, path, class_map)  # append to COCO-JSON dictionary
             callbacks.run('on_val_image_end', pred, predn, path, names, im[si])
@@ -270,13 +272,13 @@ def run(
         tp, fp, p, r, f1, ap, ap_class = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
-        nt = np.bincount(stats[3].astype(int), minlength=nc)  # number of targets per class
-    else:
-        nt = torch.zeros(1)
+    nt = np.bincount(stats[3].astype(int), minlength=nc)  # number of targets per class
 
     # Print results
     pf = '%20s' + '%11i' * 2 + '%11.3g' * 4  # print format
     LOGGER.info(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
+    if nt.sum() == 0:
+        LOGGER.warning(f'WARNING: no labels found in {task} set, can not compute metrics without labels ⚠️')
 
     # Print results per class
     if (verbose or (nc < 50 and not training)) and nc > 1 and len(stats):
@@ -367,7 +369,7 @@ def main(opt):
 
     if opt.task in ('train', 'val', 'test'):  # run normally
         if opt.conf_thres > 0.001:  # https://github.com/ultralytics/yolov5/issues/1466
-            LOGGER.info(emojis(f'WARNING: confidence threshold {opt.conf_thres} > 0.001 produces invalid results ⚠️'))
+            LOGGER.info(f'WARNING: confidence threshold {opt.conf_thres} > 0.001 produces invalid results ⚠️')
         run(**vars(opt))
 
     else:
