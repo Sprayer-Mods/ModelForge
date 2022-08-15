@@ -313,7 +313,7 @@ def git_describe(path=ROOT):  # path must be a directory
 
 @try_except
 @WorkingDirectory(ROOT)
-def check_git_status(repo='ultralytics/yolov5'):
+def check_git_status(repo='Sprayer-Mods/ModelForge'):
     # YOLOv5 status check, recommend 'git pull' if code is out of date
     url = f'https://github.com/{repo}'
     msg = f', for updates see {url}'
@@ -333,7 +333,7 @@ def check_git_status(repo='ultralytics/yolov5'):
     n = int(check_output(f'git rev-list {branch}..{remote}/master --count', shell=True))  # commits behind
     if n > 0:
         pull = 'git pull' if remote == 'origin' else f'git pull {remote} master'
-        s += f"⚠️ YOLOv5 is out of date by {n} commit{'s' * (n > 1)}. Use `{pull}` or `git clone {url}` to update."
+        s += f"⚠️ ModelForge is out of date by {n} commit{'s' * (n > 1)}. Use `{pull}` or `git clone {url}` to update."
     else:
         s += f'up to date with {url} ✅'
     LOGGER.info(s)
